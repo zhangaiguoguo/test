@@ -24,7 +24,7 @@ const ITERATE_KEY = Symbol("iterate");
 
 const isFrozen = Object.isFrozen
 
-const resolvedPromise = /* @__PURE__ */ Promise.resolve();
+const resolvedPromise = Promise.resolve();
 
 let currentFlushPromise = null
 
