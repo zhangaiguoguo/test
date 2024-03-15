@@ -702,6 +702,7 @@
       scheduler /* Dependency change function */ ,
       options = {}) {
       !isObject(options) && (options = {})
+      this.once = options.once;
       this.active = true
       this.parent = null
       this.deps = void 0
@@ -732,7 +733,13 @@
     updateDeps(newVal, oldVal, dep, flag) {
       if (!this.active) return
       flag && triggerTrigger.apply(this, [dep, newVal, oldVal])
-      this.deps.has(dep) && this.scheduler(newVal, oldVal)
+      const flag2 = this.deps.has(dep)
+      if(flag2){
+        if(this.once){
+          this.stop()
+        }
+        this.scheduler(newVal, oldVal);
+      }
     }
     start() {
       !this.active && (this.active = true)
@@ -1261,7 +1268,8 @@
     deep,
     flush,
     onTrack,
-    onTrigger
+    onTrigger,
+    once
   } = options || {}) {
     if (ordinaryType(source)) {
       return log.warn1("")
@@ -1299,7 +1307,8 @@
       onTrack,
       onTrigger,
       deep,
-      isRecollect: true
+      isRecollect: true,
+      once
     })
     if (immediate === true) {
       job()
