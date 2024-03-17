@@ -8,31 +8,29 @@
   <body ""></body>
   <script src="./index.js"></script>
   <script src="./parseTag.js"></script>
+  <script src="./pinia.js">
+  </script>
   <script>
-    console.log(hooks);
 
-    const template = `
-      <div a="<div <>></div>" a="111">
-        <div>
-        <div class="11">
-          <p>p</p>  
-        </div>
-        你好
-      <div/>
-    `;
-      let _template = template
-      const result = []
-      while(_template.trim()){
-        const res = parseTag(_template);
-        if(!res[1])break
-        if(res[0]===void 0){
-          hooks.configTool.console.warn1("error")
-          break
-        }else{
-          result.push(res)
-          _template = _template.slice(res[1].index+res[1][0].length)
+    console.log(hooks);
+    console.log(pinia)
+    pinia.installReactiveHooks(hooks)
+    pinia.createPinia()
+    const stateStore = pinia.defineStore('state',{
+      state(){
+        return {
+          num:1
         }
+      },
+      getters:{
+
+      },
+      actions:{
+
       }
-      console.log(result);
+    })
+
+    console.log(stateStore);
+
   </script>
 </html>
