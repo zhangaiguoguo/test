@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body ""></body>
+  <script src="./index.js"></script>
+  <script src="./parseTag.js"></script>
+  <script>
+    console.log(hooks);
+
+    const template = `
+      <div a="<div <>></div>" a="111">
+        <div>
+        <div class="11">
+          <p>p</p>  
+        </div>
+        你好
+      <div/>
+    `;
+    console.log(parseTag(template));
+  </script>
+</html>

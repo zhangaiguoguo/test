@@ -350,7 +350,7 @@
       const oldValue = config.self.size
       try {
         config.self.size = v
-      } catch (e) {}
+      } catch (e) { }
       setter({
         self: config,
         ref: "size",
@@ -515,14 +515,14 @@
     switch (rawType) {
       case 'Object':
       case 'Array':
-        return 1 /* TargetType.COMMON */ ;
+        return 1 /* TargetType.COMMON */;
       case 'Map':
       case 'Set':
       case 'WeakMap':
       case 'WeakSet':
-        return 2 /* TargetType.COLLECTION */ ;
+        return 2 /* TargetType.COLLECTION */;
       default:
-        return 0 /* TargetType.INVALID */ ;
+        return 0 /* TargetType.INVALID */;
     }
   }
 
@@ -626,11 +626,11 @@
   }
 
   function watchEffect(callback, options) {
-    return doWatch(callback, () => {}, options || {})
+    return doWatch(callback, () => { }, options || {})
   }
 
   function watchEffectSync(callback, options) {
-    return doWatch(callback, () => {}, {
+    return doWatch(callback, () => { }, {
       ...options || {},
       flush: "sync"
     })
@@ -655,7 +655,7 @@
   }
 
   function triggerTrack(dep) {
-    if (this !== void 0 && this !== window && this.constructor === EffectReactive) {
+    if (this !== void 0 && this !== window) {
       if (isFunction(this.onTrack) && dep) {
         this.onTrack({
           deps: dep,
@@ -667,7 +667,7 @@
   }
 
   function triggerTrigger(dep, newValue, oldValue) {
-    if (this !== void 0 && this !== window && this.constructor === EffectReactive) {
+    if (this !== void 0 && this !== window) {
       if (isFunction(this.onTrigger) && dep) {
         this.onTrigger({
           deps: dep,
@@ -698,8 +698,8 @@
    */
   class EffectReactive {
     constructor(
-      fu /* Collect Dependency Functions */ ,
-      scheduler /* Dependency change function */ ,
+      fu /* Collect Dependency Functions */,
+      scheduler /* Dependency change function */,
       options = {}) {
       !isObject(options) && (options = {})
       this.once = options.once;
@@ -711,10 +711,14 @@
       this.fu = fu
       this.scheduler = scheduler
       this.isRecollect = !!options.isRecollect
+      this.isImplement = false
       options.init && this.run()
       recordEffectScope(this)
     }
     run() {
+      if (this.once && this.isImplement) {
+        this.stop()
+      }
       if (!this.active) return
       if (this.isRecollect && this.deps) {
         this.start()
@@ -734,10 +738,8 @@
       if (!this.active) return
       flag && triggerTrigger.apply(this, [dep, newVal, oldVal])
       const flag2 = this.deps.has(dep)
-      if(flag2){
-        if(this.once){
-          this.stop()
-        }
+      if (flag2) {
+        this.isImplement = true
         this.scheduler(newVal, oldVal);
       }
     }
@@ -829,7 +831,7 @@
               }
             }
             /* Non modifiable method */
-            const no = ['delete', 'set', ]
+            const no = ['delete', 'set',]
             if (no.indexOf(p) !== -1) {
               return (...a) => _errorHandler(...a)
             }
@@ -1150,7 +1152,7 @@
             for (let w in _target) {
               _run(_target[w])
             }
-          } catch {}
+          } catch { }
         }
       }
     }
@@ -1270,31 +1272,21 @@
     onTrack,
     onTrigger,
     once
-  } = options || {}) {
+  } = options) {
     if (ordinaryType(source)) {
       return log.warn1("")
     }
     let _source, getter;
-    if (isFunction(source)) {
-      _source = [source]
-    } else if (!isReactive(source) && isArray(source)) {
-      _source = source.map(item => isFunction(item) ? item : () => item)
-    } else if (isReactive(source) || true) {
-      _source = [() => [source]]
-    }
-    if (!flush) flush = "pre"
     let cleanup, newVal, oldVal;
     const job = () => {
       oldVal = newVal || void 0
       newVal = _effectReactive.run();
       handler(newVal, oldVal)
     }
-
-    if (flush === "sync") {
-      cleanup = job
-    } else if (flush === "pre" || (flush !== "pre" && flush !== "sync")) {
-      cleanup = () => queueJob(job)
-    }
+    const _state = doWatchOptionInit(source, handler, flush, job)
+    _source = _state[0];
+    flush = _state[1]
+    cleanup = _state[2]
     getter = () => {
       const result = _source.map(cb => {
         const rt = isReactiveArr(__toValue(cb()))
@@ -1551,7 +1543,7 @@
     function createSelfState(dep) {
 
       if (tasks.some((cb) => cb === dep)) {
-        return tasks.find((cb) => cb === dep) || (() => {})
+        return tasks.find((cb) => cb === dep) || (() => { })
       }
       const state = createState()
 
@@ -1731,13 +1723,13 @@
             })
           }
           if ((function () {
-              if (effects[currentSub].init === false) {
-                return true
-              }
-              const oldDeps = uniteFunction(effects[currentSub].deps)();
-              const newDeps = uniteFunction(deps)();
-              return oldDeps == null || oldDeps.length && (newDeps.length !== (oldDeps && oldDeps.length) || (oldDeps && oldDeps.some((dep, index) => newDeps[index] !== dep)))
-            })()) {
+            if (effects[currentSub].init === false) {
+              return true
+            }
+            const oldDeps = uniteFunction(effects[currentSub].deps)();
+            const newDeps = uniteFunction(deps)();
+            return oldDeps == null || oldDeps.length && (newDeps.length !== (oldDeps && oldDeps.length) || (oldDeps && oldDeps.some((dep, index) => newDeps[index] !== dep)))
+          })()) {
             effects[currentSub].scheduler({
               callback,
               deps
@@ -1791,7 +1783,7 @@
     function watchEffect(target, deps, scheduler = (v) => v) {
       if (_judgeCurrentState()) return
       let [result, setResult] = useState(null, {
-        scheduler: () => {},
+        scheduler: () => { },
         replaceFlag: false
       })
       useEffectPre(() => {
@@ -1839,7 +1831,7 @@
     function useReducer(reducer, initialArg, init) {
       if (_judgeCurrentState()) return
       const [isInit, setInit] = createCurrentState(false, {
-        scheduler() {}
+        scheduler() { }
       })
       const _store = (typeof init === "function" && !isInit ? !setInit(true) && init(initialArg) : initialArg)
       let [store, setStore] = createCurrentState(_store, {
@@ -1928,7 +1920,7 @@
         })
       }, [state.value])
       return state
-    } catch {}
+    } catch { }
   }
 
   function uniteFunction(target) {
@@ -1977,7 +1969,131 @@
     return log.warn1("fn is not function")
   }
 
+  function doWatchSourceInit(source) {
+    let _source;
+    if (isFunction(source)) {
+      _source = [source]
+    } else if (!isReactive(source) && isArray(source)) {
+      _source = source.map(item => isFunction(item) ? item : () => item)
+    } else if (isReactive(source) || true) {
+      _source = [() => [source]]
+    }
+    return _source
+  }
+
+  function doWatchOptionInit(source, handler, flush, job) {
+    if (!flush) flush = "pre"
+    let cleanup;
+    if (flush === "sync") {
+      cleanup = job
+    } else if (flush === "pre" || (flush !== "pre" && flush !== "sync")) {
+      cleanup = () => queueJob(job)
+    }
+    return [doWatchSourceInit(source), flush, cleanup]
+  }
+
+  function doAsyncWatch(source, handler, {
+    immediate,
+    deep,
+    flush,
+    onTrack,
+    onTrigger,
+    once
+  } = options) {
+    if (ordinaryType(source)) {
+      return log.warn1("")
+    }
+    let _source, getter;
+    let cleanup, newVal, oldVal;
+    const job = async (flag) => {
+      oldVal = newVal || void 0
+      newVal = await _effectReactive.run();
+      !flag && handler(newVal, oldVal)
+    }
+    const _state = doWatchOptionInit(source, handler, flush, job)
+    _source = _state[0];
+    flush = _state[1];
+    cleanup = _state[2]
+    getter = () => {
+      return new Promise(async (resolve, reject) => {
+        const result = _source.map(async (cb, index) => {
+          let rt1;
+          try {
+            rt1 = await cb()
+          } catch (er) {
+            rt1 = er
+            log.warn1(`async watch -> argument(${index + 1}) reactive function -> reject(`, rt1, ')')
+          }
+          const rt = isReactiveArr(__toValue(rt1))
+          return deep ? _reactiveToValueDeep(rt) : rt
+        })
+        for (let i = 0; i < result.length; i++) {
+          result[i] = await result[i]
+        }
+        resolve(argumentsFlatShape(argumentsFlatShape(result)))
+      })
+    }
+
+    const _effectReactive = new effectAsyncReactive(getter, () => cleanup(), {
+      onTrack,
+      onTrigger,
+      deep,
+      isRecollect: true,
+      once
+    })
+    job(!immediate)
+
+    return () => _effectReactive.stop()
+  }
+
+  function effectAsyncReactive() {
+    const effect = new EffectAsyncReactive(arguments[0], arguments[1], {
+      ...(arguments[2] || {}),
+      init: false,
+    })
+    return {
+      run() {
+        return effect.run()
+      },
+      stop() {
+        effect.stop()
+      }
+    }
+  }
+
+  class EffectAsyncReactive extends EffectReactive {
+    async run() {
+      if (!this.active) return
+      if (this.isRecollect && this.deps) {
+        this.start()
+      }
+      this.parent = currentWatcherScope
+      try {
+        currentWatcherScope = this;
+        return await this.fu(this)
+      } finally {
+        currentWatcherScope = this.parent || null
+        this.parent = null
+        if (this.once && this.isImplement) {
+          this.stop()
+        }
+      }
+    }
+  }
+
+  function watchAsync(source, cb, options) {
+    return doAsyncWatch(source, cb, options || {})
+  }
+
+  function watchAsyncEffect(source, options) {
+    return doAsyncWatch(source, () => void 0, options || {})
+  }
+
   const hooks = {
+    effectAsyncReactive,
+    watchAsync,
+    watchAsyncEffect,
+    doAsyncWatch,
     freedEffectDeps,
     shallowReadonly,
     computed,
@@ -2015,7 +2131,8 @@
     isObject,
     isArray,
     triggerRef$,
-    ...$$hooks
+    ...$$hooks,
+    EffectAsyncReactive
   }
   return hooks
 }))
