@@ -48,6 +48,7 @@
 
   //全局配置
   const configTool = {
+    console: log,
     /**
      *  be dependent on id
      */
