@@ -22,12 +22,12 @@ export function baseParse(template, options) {
     return baseChildren(createParserContext(template), []);
 }
 
-
-
 function baseChildren(context, ancestors) {
-    const parent = last(ancestors);
     const nodes = [];
-    while (!isEnd(context, ancestors)) {
+    let num = 0
+    let flag
+    while (context.source && (flag = !isEnd(context, ancestors))) {
+        if (num > 100) break
         const s = context.source;
         let node = void 0;
         if (startsWith(s, "<")) {
@@ -36,18 +36,48 @@ function baseChildren(context, ancestors) {
             } else if (s[1] === "!") {
                 if (startsWith(s, "<!--")) {
                     console.log("comment");
+                    break
                 }
             } else if (s[1] === "/") {
-
+                console.log("/",ancestors);
+                break
             } else if (/[a-z]/i.test(s[1])) {
                 node = parseElement(context, ancestors)
-                break;
+                num++
             }
         }
+        const parent = last(ancestors);
         if (!node) {
             node = parseText(context, ancestors);
+            if (node && node.nodeValue.trim()) {
+                if (parent) {
+                    parent.children.push(node)
+                    node = null
+                }
+            } else node = null
         }
-        nodes.push(...transFormArray(node))
+        nodes.push(...transFormArray(node).filter(Boolean))
+    }
+    if (flag === false && context.source) {
+        const ecEnd = /(<\/)[^\t\r\n\f]*(>)/.exec(context.source);
+        const endStart = getCursor(context)
+        advanceBy(context, ecEnd[0].length);
+        const endEnd = getCursor(context)
+        const currentNode = ancestors.at(-1)
+        if (currentNode) {
+            currentNode.loc.end = {
+                start: endStart,
+                end: endEnd
+            }
+            ancestors.pop()
+            context.source && baseChildren(context, ancestors)
+        } else {
+            // TODO:error
+        }
+    } else {
+        if (!context.source && ancestors.length) {
+            console.log("end error", ancestors.at(-1));
+        }
     }
     return nodes;
 }
@@ -56,39 +86,12 @@ function advanceBy(context, num) {
     const sliceValue = context.source.slice(0, num)
     context.source = context.source.slice(num)
     for (let i = 0; i < sliceValue.length; i++) {
-        if (i && sliceValue[i] === "\n") {
+        if (sliceValue[i] === "\n") {
             context.line++
         }
     }
     context.offset += num
 }
-
-function generateElement(options = {}) {
-    return extend({
-        loc: {},
-        type: 1,
-        props: {
-
-        },
-        children: []
-    }, options)
-}
-
-function ancestorsPush(context, ancestors, tagName) {
-    return ancestors[ancestors.push(generateElement({
-        tag: tagName,
-        loc: {
-            start: {
-                start: getCursor(context),
-                end: null
-            },
-            end: {
-
-            }
-        }
-    })) - 1]
-}
-
 
 function parseElement(context, ancestors) {
     const parent = last(ancestors)
@@ -100,25 +103,22 @@ function parseElement(context, ancestors) {
     const endIndex = parseTagPo[1]
     let tagContext = context.source.slice(0, endIndex?.index + endIndex[0].length);
     let isSingleLabel = false
-    while (true && tagContext) {
-        let wFlag = false
-        if (tagContext[tagContext.length - 1] === ">") {
-            isSingleLabel = tagContext[tagContext.length - 2] === "/"
-            wFlag = true
-        }
-        if (!wFlag || isSingleLabel)
-            tagContext = tagContext.slice(0, -2)
-        if (wFlag) {
-            break
-        }
+    if (tagContext[tagContext.length - 1] === ">") {
+        isSingleLabel = tagContext[tagContext.length - 2] === "/"
     }
+    tagContext = tagContext.slice(0, isSingleLabel ? -2 : -1)
     node.props.source = valideStrIndex0IsS(tagContext) ? tagContext.slice(1) : tagContext
     parseAttrs(context, ancestors)
     advanceBy(context, tagContext.length + (isSingleLabel ? 2 : 1));
     node.loc.start.end = getCursor(context)
     if (isSingleLabel) {
-        console.log("单标签");
+        ancestors.pop()
     }
+    if (parent) {
+        parent.children.push(node);
+        return null
+    }
+    return node
 }
 
 function valideStrIndex0IsS(str) {
@@ -133,7 +133,7 @@ function parseAttrs(context, ancestors) {
     const currentNode = last(ancestors)
     const props = currentNode.props
     console.log(context);
-    console.log(parseAttrs$(context, props.source));
+    ancestors.at(-1).props.attrs = parseAttrs$(context, props.source);
 }
 
 function parseAttrs$(context, str) {
@@ -216,4 +216,31 @@ function parseTextData(
         // DATA or RCDATA containing "&"". Entity decoding required.
         return decodeEntities(rawText);
     }
+}
+
+
+function generateElement(options = {}) {
+    return extend({
+        loc: {},
+        type: 1,
+        props: {
+
+        },
+        children: []
+    }, options)
+}
+
+function ancestorsPush(context, ancestors, tagName) {
+    return ancestors[ancestors.push(generateElement({
+        tag: tagName,
+        loc: {
+            start: {
+                start: getCursor(context),
+                end: null
+            },
+            end: {
+
+            }
+        }
+    })) - 1]
 }

@@ -527,6 +527,10 @@
     }
   }
 
+  function isRef2(target) {
+    return target._is_ref === true
+  }
+
   const proxyKEY1 = '__reactive'
 
   const proxyKEY2 = '__skip'
@@ -561,6 +565,9 @@
     } = options || {}
     const configToolProxy = __$isReactive(target)
     if (configToolProxy) {
+      if (isRef2(configToolProxy[0])) {
+        return configToolProxy[0]
+      }
       return configToolProxy[1].selfProxy
     }
     dep = dep || generateDep()
@@ -589,14 +596,19 @@
             }
           }
           const _type = Reflect.has(target, p) ? "set" : "add"
-          Reflect.set(target, p, value, reactive);
-          return setter({
-            self: config,
-            ref: p,
-            newVal: value,
-            oldVal: oldValue,
-            type: _type
-          }) || true
+          if (isRef(target[p])) {
+            target[p].value = value
+            return true
+          } else {
+            Reflect.set(target, p, value, reactive);
+            return setter({
+              self: config,
+              ref: p,
+              newVal: value,
+              oldVal: oldValue,
+              type: _type
+            }) || true
+          }
         },
         deleteProperty(target, p) {
           const oldValue = Reflect.get(target, p);
@@ -765,17 +777,17 @@
     }
   }
 
-  function effectReactive(...args) {
-    const _watcher = new EffectReactive(args[0], args[1], {
-      ...(args[2] || {}),
+  function effectReactive(fn, callback, options) {
+    const effect = new EffectReactive(arguments[0], arguments[1], {
+      ...(arguments[2] || {}),
       init: false,
     })
     return {
       run() {
-        return _watcher.run()
+        return effect.run()
       },
       stop() {
-        _watcher.stop()
+        effect.stop()
       }
     }
   }
@@ -901,7 +913,8 @@
         self: target,
         deps: new Map()
       })
-      target.deps = trackEffects(target, "value", "get")
+      const deps = trackEffects(target, "value", "get")
+      toRaw(target.deps) !== deps && (target.deps = deps)
       if (target._objectRoot && target._key) {
         trackEffects(target._objectRoot, target._key, "get")
       }
