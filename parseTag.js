@@ -49,7 +49,7 @@ function parseTag(template) {
       index--
     }
     prevA = a;
-    if (result.filter((i) => !i.isUse).length === 0) {
+    if (result.filter((i) => i&&!i.isUse).length === 0) {
       currentStr = s
       break
     }
