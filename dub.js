@@ -1,4 +1,4 @@
-import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag } from "./utils.js"
+import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag, isEndTag, warnLog } from "./utils.js"
 function createParserContext(
     content,
     rawOptions,
@@ -28,35 +28,47 @@ function baseChildren(context, ancestors) {
     let flag
     while (context.source && (flag = !isEnd(context, ancestors))) {
         if (num > 100) break
+        let parent = last(ancestors);
         const s = context.source;
-        let node = void 0;
+        let node;
         if (startsWith(s, "<")) {
             if (s.length === 1) {
-                break;
+                warnLog(context)
             } else if (s[1] === "!") {
+                let flag2 = false
                 if (startsWith(s, "<!--")) {
-                    console.log("comment");
+                    flag2 = !!(node = parseComment(context, ancestors))
+                }
+                if (!flag2) {
+                    console.error("error comment")
                     break
                 }
             } else if (s[1] === "/") {
-                console.log("/",ancestors);
+                if (isEndTag(context.source)) {
+                    flag = false
+                } else {
+                    console.error("error /", ancestors);
+                }
                 break
             } else if (/[a-z]/i.test(s[1])) {
                 node = parseElement(context, ancestors)
                 num++
             }
         }
-        const parent = last(ancestors);
         if (!node) {
+            parent = last(ancestors);
             node = parseText(context, ancestors);
             if (node && node.nodeValue.trim()) {
-                if (parent) {
-                    parent.children.push(node)
-                    node = null
-                }
+                //TODO
             } else node = null
         }
-        nodes.push(...transFormArray(node).filter(Boolean))
+        if (node) {
+            if (parent) {
+                parent.children.push(node)
+            } else {
+                nodes.push(...transFormArray(node).filter(Boolean))
+            }
+        }
     }
     if (flag === false && context.source) {
         const ecEnd = /(<\/)[^\t\r\n\f]*(>)/.exec(context.source);
@@ -70,7 +82,12 @@ function baseChildren(context, ancestors) {
                 end: endEnd
             }
             ancestors.pop()
-            context.source && baseChildren(context, ancestors)
+            if (context.source) {
+                const pNodes = baseChildren(context, ancestors)
+                if (ancestors.length === 0) {
+                    nodes.push(...pNodes)
+                }
+            }
         } else {
             // TODO:error
         }
@@ -91,6 +108,24 @@ function advanceBy(context, num) {
         }
     }
     context.offset += num
+}
+
+function parseComment(context, ancestors) {
+    const findCommentEnd = /(<!--).*(-->)/sg.exec(context.source);
+    if (findCommentEnd) {
+        const commentNode = {
+            loc: {
+                start: getCursor(context)
+            },
+            type: 8,
+            nodeValue: findCommentEnd[0]
+        }
+        advanceBy(context, findCommentEnd[0].length);
+        commentNode.loc.end = getCursor(context)
+        return commentNode
+    } else {
+        console.error("error comment NOT end")
+    }
 }
 
 function parseElement(context, ancestors) {
@@ -132,7 +167,6 @@ function valideStrIndex0IsS(str) {
 function parseAttrs(context, ancestors) {
     const currentNode = last(ancestors)
     const props = currentNode.props
-    console.log(context);
     ancestors.at(-1).props.attrs = parseAttrs$(context, props.source);
 }
 

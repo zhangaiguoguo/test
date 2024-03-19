@@ -1,10 +1,14 @@
 export function template() {
-  return `<br/><hr/>你好
-  <template #default="{ row }">
-    <span @click="viewRecordInf(row)" style="cursor:pointer;">{{ row.inspectionItemName }}</span>
-  </template>
+  return `<br/><hr/>你好<!----
+  
+  <div 你好 >
+  
+  ---->
+    <template #default="{ row }" html="<div html="你好" title='<p>失败</p>'></div>">
+        <span @click="viewRecordInf(row)" style="cursor:pointer;">{{ row.inspectionItemName }}</span>
+    </template>
   <template>
-  <el-row v-loading="loading" style="width: 100%;margin: 10px auto;">
+    <el-row v-loading="loading" style="width: 100%;margin: 10px auto;">
       <el-table :data="sameBatchOfTasksList" border stripe style="width: 100%;margin:0 auto;"
                 @cell-dblclick="cellDblclick">
           <el-table-column prop="inspectionItemName" label="检测项目" align="center" min-width="180"
@@ -67,6 +71,7 @@ export function template() {
       <ViewRecordInfoComponent ref="viewRecordInfoComponentRef" :isPrint="true"
                                :hasPermis="['sample:sampleStatusQuery:print']" />
   </el-row>
-</template>
-  `
+</template>你好
+
+你好<`
 }

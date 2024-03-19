@@ -1,44 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-  </head>
-  <body ""></body>
-  <script src="./index.js"></script>
-  <script src="./parseTag.js"></script>
-  <script src="./pinia.js">
-  </script>
-  <script>
 
-    // console.log(hooks);
-    // console.log(pinia)
-    // pinia.installReactiveHooks(hooks)
-    // pinia.createPinia()
-    // const stateStore = pinia.defineStore('state',{
-    //   state(){
-    //     return {
-    //       num:1
-    //     }
-    //   },
-    //   getters:{
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document</title>
+</head>
 
-    //   },
-    //   actions:{
+<body>
 
-    //   }
-    // })
+  <!-- 
+      div
 
-    // console.log(stateStore);
+    -->
+</body>
+<script src="./index.js"></script>
+<script src="./parseTag.js"></script>
+<script src="./pinia.js">
+</script>
+<script>
 
-  </script>
-  <script type="module">
-    import {template} from "./template.js"
-    import {baseParse} from "./dub.js"
+  // console.log(hooks);
+  // console.log(pinia)
+  // pinia.installReactiveHooks(hooks)
+  // pinia.createPinia()
+  // const stateStore = pinia.defineStore('state',{
+  //   state(){
+  //     return {
+  //       num:1
+  //     }
+  //   },
+  //   getters:{
 
+  //   },
+  //   actions:{
+
+  //   }
+  // })
+
+  // console.log(stateStore);
+
+</script>
+<script type="module">
+  import { template } from "./template.js"
+  import { baseParse } from "./dub.js"
+  const startDate = Date.now()
+  try {
     console.log(baseParse(template()));
+    console.log(Date.now() - startDate);
+  } catch (err) {
+    console.warn(err)
+  }
 
 
-  </script>
+</script>
+
 </html>

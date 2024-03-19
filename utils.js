@@ -54,7 +54,7 @@ export function isEnd(context, ancestors) {
     switch (1) {
         case 1:
             if (startsWith(s, "</")) {
-                for (let i = ancestors.length - 1; i > 0; i--) {
+                for (let i = ancestors.length - 1; i >= 0; i--) {
                     if (startsWithEndTagOpen(s, ancestors[i].tag)) {
                         return true;
                     }
@@ -63,6 +63,11 @@ export function isEnd(context, ancestors) {
             break;
     }
 }
+
+export function isEndTag(str) {
+    return startsWith(str, "</") && /(<\/)[^\t\r\n\f]*(>)/.exec(str)
+}
+
 export function transFormArray(target) {
     return Array.isArray(target) ? target : [target]
 }
@@ -152,4 +157,46 @@ export function parseTag(context) {
         }
     }
     return [currentStr, prevA, results]
+}
+
+export const TIPWARNNLINE = 10
+
+export function warnLog(context) {
+    const s = context.source
+    const os = context.originalSource;
+    const tips = os.slice(0, context.offset + s.length)
+    let nl = 0
+    let si = os.length - 1
+    let lastNl = 0
+    while (si && nl < TIPWARNNLINE) {
+        if (os[si] === "\n") {
+            if (nl === 0) {
+                lastNl = getStrlen(tips.slice(si - 1))
+            }
+            nl++
+        }
+        si--
+    }
+    jsConsole.warn("Unexpected EOF in tag (<) -> (&lt;)\n| " + tips.slice(si).replace(/[\n]+/g, "\n|\t") + "\n " + ('^').repeat(lastNl + 1))
+}
+
+export function getStrlen(str) {
+    var len = 0;
+    for (var i = 0; i < str.length; i++) {
+        var c = str.charCodeAt(i);
+        //单字节加1 
+        if ((c >= 0x0001 && c <= 0x007e) || (0xff60 <= c && c <= 0xff9f)) {
+            len++;
+        }
+        else {
+            len += 2;
+        }
+    }
+    return len;
+}
+
+export const jsConsole ={
+    warn(...args){
+        console.warn('[warn]',...args)
+    }
 }
