@@ -1,9 +1,61 @@
 export function template() {
+  return `
+
+  <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<!DOCTYPE html PUBLIC 
+"-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" >
+<head>
+<title>CDATA Example</title>
+</head>
+<body>
+
+<h2>Using a Comment</h2>
+<div id="commentExample">
+<!--
+You won't see this in the document
+and can use reserved characters like
+< > & "
+-->
+</div>
+
+<h2>Using a CDATA Section</h2>
+<div id="cdataExample">
+<![CDATA[
+You will see this in the document
+and can use reserved characters like
+< > & "
+]]>
+</div>
+
+</body>
+</html>
+
+  `
   return `<br/><hr/>你好<!----
   
   <div 你好 >
   
   ---->
+  <!DOCTYPE adsf html>
+  <!DOCTYPE asd 
+   html>
+  <![CDATA[
+    Within this Character Data block I can
+    use double dashes as much as I want (along with <, &, ', and ")
+    *and* %MyParamEntity; will be expanded to the text
+    "Has been expanded" ... however, I can't use
+    the CEND sequence. If I need to use CEND I must escape one of the
+    brackets or the greater-than sign using concatenated CDATA sections.
+    ]]>
+    <description>An example of escaped CENDs</description>
+<!-- This text contains a CEND ]]> -->
+<!-- In this first case we put the ]] at the end of the first CDATA block
+     and the > in the second CDATA block -->
+<data><![CDATA[This text contains a CEND ]]]]><![CDATA[>]]></data>
+<!-- In this second case we put a ] at the end of the first CDATA block
+     and the ]> in the second CDATA block -->
+<alternative><![CDATA[This text contains a CEND ]]]><![CDATA[]>]]></alternative>
     <template #default="{ row }" html="<div html="你好" title='<p>失败</p>'></div>">
         <span @click="viewRecordInf(row)" style="cursor:pointer;">{{ row.inspectionItemName }}</span>
     </template>
@@ -71,7 +123,5 @@ export function template() {
       <ViewRecordInfoComponent ref="viewRecordInfoComponentRef" :isPrint="true"
                                :hasPermis="['sample:sampleStatusQuery:print']" />
   </el-row>
-</template>你好
-
-你好<`
+</template>`
 }

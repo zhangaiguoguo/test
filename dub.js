@@ -38,6 +38,10 @@ function baseChildren(context, ancestors) {
                 let flag2 = false
                 if (startsWith(s, "<!--")) {
                     flag2 = !!(node = parseComment(context, ancestors))
+                } else if (startsWith(s, "<!DOCTYPE")) {
+                    flag2 = !!(node = parseDocType(context, ancestors))
+                } else if (startsWith(s, '<![CDATA[')) {
+                    flag2 = !!(node = parseCDATA(context, ancestors))
                 }
                 if (!flag2) {
                     console.error("error comment")
@@ -110,21 +114,60 @@ function advanceBy(context, num) {
     context.offset += num
 }
 
+function parseCDATA(context, ancestors) {
+    const findCDATAEnd = /(]]>)/sg.exec(context.source);
+    if (findCDATAEnd) {
+        const source = context.source.slice(0, findCDATAEnd.index + findCDATAEnd[0].length)
+        const CDATANode = {
+            loc: {
+                start: getCursor(context)
+            },
+            type: 'CDATA',
+            source: source
+        }
+        advanceBy(context, source.length);
+        CDATANode.loc.end = getCursor(context)
+        return CDATANode
+    } else {
+        // TODO:
+    }
+}
+
+function parseDocType(context, ancestors) {
+    const findDocEnd = /(\shtml\s?[^<>]*>)/m.exec(context.source);
+    if (findDocEnd) {
+        const source = context.source.slice(0, findDocEnd.index + findDocEnd[0].length)
+        const docNode = {
+            loc: {
+                start: getCursor(context)
+            },
+            type: 'DOCTYPE',
+            source: source
+        }
+        advanceBy(context, source.length);
+        docNode.loc.end = getCursor(context)
+        return docNode
+    } else {
+        // TODO:
+    }
+}
+
 function parseComment(context, ancestors) {
-    const findCommentEnd = /(<!--).*(-->)/sg.exec(context.source);
+    const findCommentEnd = /(-->)/g.exec(context.source);
     if (findCommentEnd) {
+        const nodeValue = context.source.slice(0, findCommentEnd.index + findCommentEnd[0].length)
         const commentNode = {
             loc: {
                 start: getCursor(context)
             },
             type: 8,
-            nodeValue: findCommentEnd[0]
+            nodeValue: nodeValue,
         }
-        advanceBy(context, findCommentEnd[0].length);
+        advanceBy(context, nodeValue.length);
         commentNode.loc.end = getCursor(context)
         return commentNode
     } else {
-        console.error("error comment NOT end")
+        // TODO:
     }
 }
 

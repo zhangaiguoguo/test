@@ -177,26 +177,33 @@ export function warnLog(context) {
         }
         si--
     }
-    jsConsole.warn("Unexpected EOF in tag (<) -> (&lt;)\n| " + tips.slice(si).replace(/[\n]+/g, "\n|\t") + "\n " + ('^').repeat(lastNl + 1))
+    jsConsole.warn("Unexpected EOF in tag (<) -> (&lt;)\n| " + tips.slice(si).replace(/[\n]+/g, "\n|\t") + "\n↳\n " + ('^').repeat(lastNl))
+    console.log(s);
 }
 
 export function getStrlen(str) {
     var len = 0;
+    stringSubCodeIndex(str, (v) => {
+        len += v
+    })
+    return len
+}
+
+function stringSubCodeIndex(str, callback) {
     for (var i = 0; i < str.length; i++) {
         var c = str.charCodeAt(i);
         //单字节加1 
         if ((c >= 0x0001 && c <= 0x007e) || (0xff60 <= c && c <= 0xff9f)) {
-            len++;
+            callback(1)
         }
         else {
-            len += 2;
+            callback(2)
         }
     }
-    return len;
 }
 
-export const jsConsole ={
-    warn(...args){
-        console.warn('[warn]',...args)
+export const jsConsole = {
+    warn(...args) {
+        console.warn('[warn]', ...args)
     }
 }
