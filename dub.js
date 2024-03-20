@@ -1,4 +1,4 @@
-import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag, isEndTag, warnLog, warnLog2, warnNotStartTag } from "./utils.js"
+import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag, isEndTag, warnLog, warnLog2, warnNotStartTag, reverseOrderLoopFindTarget, warnLog3 } from "./utils.js"
 function createParserContext(
     content,
     rawOptions,
@@ -118,12 +118,12 @@ function parseChildren(context, ancestors) {
 }
 
 function advanceBy(context, num) {
-    context.column = 0
     const sliceValue = context.source.slice(0, num)
     context.source = context.source.slice(num)
     for (let i = 0; i < sliceValue.length; i++) {
         if (sliceValue[i] === "\n") {
             context.line++
+            context.column = 0
         }
         context.column++
     }
@@ -206,10 +206,20 @@ function parseComment(context, ancestors) {
     }
 }
 
+function parseElementFilter(content, ancestors, tagName, tagExec) {
+    const parent = last(ancestors)
+    if (parent) {
+        if (parent.tag === "p" && tagName === "div") {
+            warnLog3(content, parent, tagExec, tagName)
+        }
+    }
+}
+
 function parseElement(context, ancestors) {
     const parent = last(ancestors)
     const tag = /^<\/?([a-z][^\t\r\n\f />]*)/i.exec(context.source)
     const tagName = tag[1];
+    parseElementFilter(context, ancestors, tagName, tag)
     const node = ancestorsPush(context, ancestors, tagName)
     advanceBy(context, tagName.length + 1);
     const parseTagPo = parseTag(context)
@@ -270,9 +280,10 @@ function parseAttrs$(context, str) {
                 endIndex = str.length
             }
             const attrValue = slice(str, 0, endIndex);
-            console.log(/^([^\t\r\n\f])=("|'\`)/.exec());
+            let splitIndex = attrValue.indexOf("=")
             attrs.push({
-                key: attrValue,
+                attrKey: splitIndex === -1 ? attrValue : attrValue.slice(0, splitIndex),
+                attrValue: splitIndex === -1 ? "" : attrValue.slice(splitIndex + 2, reverseOrderLoopFindTarget(attrValue, attrValue[splitIndex + 1]) + 1),
                 source: attrValue,
                 loc: {
                     start: {

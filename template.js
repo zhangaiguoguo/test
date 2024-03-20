@@ -10,8 +10,7 @@ export function template() {
 <title>CDATA Example</title>
 </head>
 <body>
-
-<h2>Using a Comment</h2>
+<h2 ab>Using a Comment</h2>
 <div id="commentExample">
 <!--
 You won't see this in the document
