@@ -1,4 +1,4 @@
-import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag, isEndTag, warnLog } from "./utils.js"
+import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag, isEndTag, warnLog, warnLog2, warnNotStartTag } from "./utils.js"
 function createParserContext(
     content,
     rawOptions,
@@ -19,10 +19,10 @@ function createParserContext(
 }
 
 export function baseParse(template, options) {
-    return baseChildren(createParserContext(template), []);
+    return parseChildren(createParserContext(template), []);
 }
 
-function baseChildren(context, ancestors) {
+function parseChildren(context, ancestors) {
     const nodes = [];
     let num = 0
     let flag
@@ -57,6 +57,8 @@ function baseChildren(context, ancestors) {
             } else if (/[a-z]/i.test(s[1])) {
                 node = parseElement(context, ancestors)
                 num++
+            } else if (startsWith(s, '<?')) {
+                node = parseBogusComment(context, ancestors)
             }
         }
         if (!node) {
@@ -75,25 +77,37 @@ function baseChildren(context, ancestors) {
         }
     }
     if (flag === false && context.source) {
-        const ecEnd = /(<\/)[^\t\r\n\f]*(>)/.exec(context.source);
-        const endStart = getCursor(context)
-        advanceBy(context, ecEnd[0].length);
-        const endEnd = getCursor(context)
-        const currentNode = ancestors.at(-1)
-        if (currentNode) {
-            currentNode.loc.end = {
-                start: endStart,
-                end: endEnd
-            }
-            ancestors.pop()
-            if (context.source) {
-                const pNodes = baseChildren(context, ancestors)
-                if (ancestors.length === 0) {
-                    nodes.push(...pNodes)
-                }
-            }
+        const ecEnd = /(<\/)[^\t\r\n\f<]*(>)/.exec(context.source);
+        if (!ancestors.length) {
+            warnNotStartTag(context, ecEnd)
+            const sliceNum = ecEnd.index + ecEnd[0].length
+            context.source = context.source.slice(sliceNum)
+            context.offset += sliceNum
         } else {
-            // TODO:error
+            const endStart = getCursor(context)
+            const currentNode = ancestors.at(-1)
+            const ecEndTag = ecEnd[0].slice(2, -1)
+            advanceBy(context, ecEnd[0].length);
+            const endEnd = getCursor(context)
+            if (ecEndTag !== currentNode.tag) {
+                warnLog2(context, {
+                    start: endStart,
+                    end: endEnd
+                }, currentNode)
+            }
+            if (currentNode) {
+                currentNode.loc.end = {
+                    start: endStart,
+                    end: endEnd
+                }
+                ancestors.pop()
+            }
+        }
+        if (context.source) {
+            const pNodes = parseChildren(context, ancestors)
+            if (ancestors.length === 0) {
+                nodes.push(...pNodes)
+            }
         }
     } else {
         if (!context.source && ancestors.length) {
@@ -104,14 +118,35 @@ function baseChildren(context, ancestors) {
 }
 
 function advanceBy(context, num) {
+    context.column = 0
     const sliceValue = context.source.slice(0, num)
     context.source = context.source.slice(num)
     for (let i = 0; i < sliceValue.length; i++) {
         if (sliceValue[i] === "\n") {
             context.line++
         }
+        context.column++
     }
     context.offset += num
+}
+
+function parseBogusComment(context, ancestors) {
+    const bogusExec = /(\s?\?>)/sg.exec(context.source);
+    if (bogusExec) {
+        const source = context.source.slice(0, bogusExec.index + bogusExec[0].length)
+        const node = {
+            loc: {
+                start: getCursor(context)
+            },
+            type: 8,
+            nodeValue: source
+        }
+        advanceBy(context, source.length);
+        node.loc.end = getCursor(context)
+        return node
+    } else {
+        // TODO:
+    }
 }
 
 function parseCDATA(context, ancestors) {
@@ -161,7 +196,7 @@ function parseComment(context, ancestors) {
                 start: getCursor(context)
             },
             type: 8,
-            nodeValue: nodeValue,
+            nodeValue: nodeValue.slice(4, -3),
         }
         advanceBy(context, nodeValue.length);
         commentNode.loc.end = getCursor(context)
@@ -234,16 +269,19 @@ function parseAttrs$(context, str) {
             } else {
                 endIndex = str.length
             }
+            const attrValue = slice(str, 0, endIndex);
+            console.log(/^([^\t\r\n\f])=("|'\`)/.exec());
             attrs.push({
-                source: slice(str, 0, endIndex),
+                key: attrValue,
+                source: attrValue,
                 loc: {
                     start: {
                         offset: offset,
-                        line
+                        line, column: offset - context.offset
                     },
                 }
             })
-            for (let w of slice(str, 0, endIndex)) {
+            for (let w of attrValue) {
                 if (w === "\n") {
                     line++
                 }
@@ -251,7 +289,7 @@ function parseAttrs$(context, str) {
             offset += endIndex
             attrs.at(-1).loc.end = {
                 offset: offset,
-                line
+                line, column: offset - context.offset
             }
             str = slice(str, endIndex).trim()
             limitation++

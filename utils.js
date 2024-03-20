@@ -177,8 +177,47 @@ export function warnLog(context) {
         }
         si--
     }
-    jsConsole.warn("Unexpected EOF in tag (<) -> (&lt;)\n| " + tips.slice(si).replace(/[\n]+/g, "\n|\t") + "\n↳\n " + ('^').repeat(lastNl))
-    console.log(s);
+    const syntaxError = new SyntaxError("Unexpected EOF in tag (<) -> (&lt;)\n| " + tips.slice(si).replace(/[\n]+/g, "\n|\t") + "\n  " + ('^').repeat(lastNl))
+    jsConsole.warn(syntaxError)
+}
+
+export function warnLog2(context, loc, node) {
+    const os = context.originalSource
+    const cTag = os.slice(loc.start.offset, loc.end.offset);
+    const value = os.slice(node.loc.start.end.offset, loc.end.offset);
+    const startTip = os.slice(node.loc.start.start.offset, node.loc.start.end.offset)
+    const endTip = value.slice(getStrLastN(value, loc.end.offset, 0) + 2)
+    const result = [startTip + "\n" + ('^'.repeat(getStrlen(startTip))), endTip + "\n" + ('^'.repeat(getStrlen(endTip)))]
+    const error = new SyntaxError("Invalid end tag \n" + result[0] + value.slice(0, value.length - endTip.length) + "\n" + result[1])
+    jsConsole.warn(error)
+}
+
+export function warnNotStartTag(context, curNode) {
+    const column = curNode[0].length + curNode.index
+    const os = context.originalSource
+    const sos = os.slice(getStrLastN(os, context.offset, 0), context.offset + column)
+    const v = os.slice(getStrLastN(os, os.length - 1, TIPWARNNLINE), context.offset)
+    jsConsole.warn(new SyntaxError("Invalid end tag" + v.replace(/[\n]+/g, "\n| ") + curNode[0] + "\n" + ("^").repeat(getStrlen(sos))))
+}
+
+export function getStrLastN(str, startIndex = str.length - 1, lineNum = 2) {
+    while (startIndex && lineNum >= 0) {
+        if (str[startIndex] === "\n") {
+            lineNum--
+        }
+        startIndex--
+    }
+    return startIndex++
+}
+
+export function parseStrNextN(str, startIndex, lineNum = 2) {
+    while (startIndex < str.length && lineNum >= 0) {
+        if (str[startIndex] === "\n") {
+            lineNum--
+        }
+        startIndex++
+    }
+    return startIndex--
 }
 
 export function getStrlen(str) {

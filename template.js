@@ -1,6 +1,7 @@
 export function template() {
-  return `
-
+    return `
+<!--啊v1111234234
+你424234好234243243242-->
   <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <!DOCTYPE html PUBLIC 
 "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -27,12 +28,9 @@ and can use reserved characters like
 < > & "
 ]]>
 </div>
-
 </body>
-</html>
-
-  `
-  return `<br/><hr/>你好<!----
+</html>`
+    return `<br/><hr/>你好<!----
   
   <div 你好 >
   
