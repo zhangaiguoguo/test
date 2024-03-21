@@ -1,34 +1,11 @@
 export function template() {
     return `
-<!--啊v1111234234
-你424234好234243243242-->
-  <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<!DOCTYPE html PUBLIC 
-"-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" >
-<head>
-<title>CDATA Example</title>
-</head>
-<body>
-<h2 onclick="()=>void 0" ab>Using a Comment</h2>
-<div id="commentExample">
-<!--
-You won't see this in the document
-and can use reserved characters like
-< > & "
--->
-</div>
 
-<h2>Using a CDATA Section</h2>
-<div id="cdataExample">
-<![CDATA[
-You will see this in the document
-and can use reserved characters like
-< > & "
-]]>
-</div>
-</body>
-</html>`
+        <p a b c class="sdflkjsfdkl sdflksdjf a='sdffds'">
+            你好
+        </p>
+
+    `
     return `<br/><hr/>你好<!----
   
   <div 你好 >

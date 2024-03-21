@@ -199,8 +199,8 @@ export function warnLog2(context, loc, node) {
     const value = os.slice(node.loc.start.end.offset, loc.end.offset);
     const startTip = os.slice(node.loc.start.start.offset, node.loc.start.end.offset)
     const endTip = value.slice(getStrLastN(value, loc.end.offset, 0) + 2)
-    const result = [startTip + "\n" + ('^'.repeat(getStrlen(startTip))), endTip + "\n" + ('^'.repeat(getStrlen(endTip)))]
-    const error = new SyntaxError("Invalid end tag \n\n" + result[0] + value.slice(0, value.length - endTip.length).replace(/[\n]+/g, "\n| ") + "\n" + result[1])
+    const result = [startTip + "\n" + ('^'.repeat(getStrlen(startTip))), endTip + "\n" + tipIconRepeat(context.column - 1)]
+    const error = new SyntaxError("Invalid end tag \n| " + (result[0] + value.slice(0, value.length - endTip.length) + result[1]).replace(/[\n]+/g, "\n| "))
     jsConsole.warn(error)
 }
 
@@ -209,7 +209,7 @@ export function warnNotStartTag(context, curNode) {
     const os = context.originalSource
     const sos = os.slice(getStrLastN(os, context.offset, 0), context.offset + column)
     const v = os.slice(getStrLastN(os, os.length - 1, TIPWARNNLINE), context.offset)
-    jsConsole.warn(new SyntaxError("Invalid end tag" + v.replace(/[\n]+/g, "\n| ") + curNode[0] + "\n" + ("^").repeat(getStrlen(sos))))
+    jsConsole.warn(new SyntaxError("Invalid end tag \n| " + v.replace(/[\n]+/g, "\n| ") + curNode[0] + "\n" + ("^").repeat(getStrlen(sos))))
 }
 
 export function getStrLastN(str, startIndex = str.length - 1, lineNum = 2) {
@@ -220,6 +220,14 @@ export function getStrLastN(str, startIndex = str.length - 1, lineNum = 2) {
         startIndex--
     }
     return startIndex
+}
+
+export function warnNotEndTag(context, node) {
+    const os = context.originalSource
+    const { start, end } = node.loc
+    const tipValue = os.slice(start.start.offset - start.start.column)
+    const index = parseStrNextN(tipValue, 0, 1)
+    jsConsole.warn(new SyntaxError("Element is missing end tag.\n "+strNtransfromN2(tipValue.slice(0, index) + tipIconRepeat(start.start.column + node.tag.length) + "\n" + tipValue.slice(index))))
 }
 
 export function parseStrNextN(str, startIndex, lineNum = 2) {
@@ -260,7 +268,7 @@ export function warnLog3(context, parent, exec, tagName) {
     const nIndex = getStrLastN(startValue, startValue.length - 1, 6)
     const { start, end } = parent.loc
     const startValue2 = os.slice(start.end.offset, currentLoc.offset + exec[0].length)
-    jsConsole.warn(new SyntaxError(`End tag mismatch (${parent.tag} > ${tagName}) \n| `+strNtransfromN2(startValue.slice(nIndex, start.end.offset) + "\n" + tipIconRepeat(start.end.column - 1)) + strNtransfromN2(startValue2 + "\n " + tipIconRepeat(currentLoc.column - 2 + exec[0].length))))
+    jsConsole.warn(new SyntaxError(`End tag mismatch (${parent.tag} > ${tagName}) \n| ` + strNtransfromN2(startValue.slice(nIndex, start.end.offset) + "\n" + tipIconRepeat(start.end.column - 1)) + strNtransfromN2(startValue2 + "\n " + tipIconRepeat(currentLoc.column - 2 + exec[0].length))))
 }
 
 function tipIconRepeat(num) {

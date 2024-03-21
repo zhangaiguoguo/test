@@ -1,4 +1,4 @@
-import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag, isEndTag, warnLog, warnLog2, warnNotStartTag, reverseOrderLoopFindTarget, warnLog3 } from "./utils.js"
+import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag, isEndTag, warnLog, warnLog2, warnNotStartTag, reverseOrderLoopFindTarget, warnLog3, warnNotEndTag } from "./utils.js"
 function createParserContext(
     content,
     rawOptions,
@@ -24,13 +24,11 @@ export function baseParse(template, options) {
 
 function parseChildren(context, ancestors) {
     const nodes = [];
-    let num = 0
     let flag
     while (context.source && (flag = !isEnd(context, ancestors))) {
-        if (num > 100) break
         let parent = last(ancestors);
         const s = context.source;
-        let node;
+        let node = null;
         if (startsWith(s, "<")) {
             if (s.length === 1) {
                 warnLog(context)
@@ -56,12 +54,11 @@ function parseChildren(context, ancestors) {
                 break
             } else if (/[a-z]/i.test(s[1])) {
                 node = parseElement(context, ancestors)
-                num++
             } else if (startsWith(s, '<?')) {
                 node = parseBogusComment(context, ancestors)
             }
         }
-        if (!node) {
+        if (node === null) {
             parent = last(ancestors);
             node = parseText(context, ancestors);
             if (node && node.nodeValue.trim()) {
@@ -111,7 +108,9 @@ function parseChildren(context, ancestors) {
         }
     } else {
         if (!context.source && ancestors.length) {
-            console.log("end error", ancestors.at(-1));
+            for (let i = 0; i < ancestors.length; i++) {
+                warnNotEndTag(context, ancestors[i])
+            }
         }
     }
     return nodes;
@@ -239,7 +238,7 @@ function parseElement(context, ancestors) {
     }
     if (parent) {
         parent.children.push(node);
-        return null
+        return
     }
     return node
 }
@@ -269,7 +268,8 @@ function parseAttrs$(context, str) {
             let startIndex = str.indexOf(" ")
             let endIndex = startIndex
             startIndex = startIndex === -1 ? 0 : startIndex
-            const ec = /(?!(=("|'|`)[^=]\s))=("|'|`)(.*?)("|'|`)\s/ms.exec(str);
+            const ec = /(?!(=("|'|`)))=("|'|`)(.*?)("|'|`)\s/ms.exec(str);
+            console.log(ec,str);
             if (ec) {
                 if (ec.index > startIndex && startIndex) {
                     //TODO
