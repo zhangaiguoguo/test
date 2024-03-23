@@ -1,9 +1,9 @@
 export function template() {
     return `
-
-        <p a b c class="sdflkjsfdkl sdflksdjf a='sdffds'">
+        <br a a bc sdf sdf a=12 b=123 c="12312" />
+        <ppppp a b class="asdf">
             你好
-        </p>
+        </ppppp>
 
     `
     return `<br/><hr/>你好<!----

@@ -173,6 +173,16 @@ export function reverseOrderLoopFindTarget(str, target, targetNum = 1) {
 
 export const TIPWARNNLINE = 10
 
+export function attrWarnLog(context, current, preCurrent, value,node) {
+    const os = context.originalSource
+    const a = os.slice(0, current.loc.end.offset)
+    const subIndex = [getStrLastN(a, a.length - 1, 0) + 2]
+    const subValue = [a.slice(subIndex[0])]
+    const endTipString = subValue[0] + '\n| ' + tipIconRepeat(subValue[0].length - 1)
+    const error = new SyntaxError(`<${node.tag}> tag attribute (${value.trim()}) already exists\n\t (at ${current.loc.start.line}:${current.loc.start.column + 2})\n `+a.slice(0, subIndex[0] + 1) + endTipString)
+    jsConsole.warn(error)
+}
+
 export function warnLog(context) {
     const s = context.source
     const os = context.originalSource;
@@ -227,7 +237,7 @@ export function warnNotEndTag(context, node) {
     const { start, end } = node.loc
     const tipValue = os.slice(start.start.offset - start.start.column)
     const index = parseStrNextN(tipValue, 0, 1)
-    jsConsole.warn(new SyntaxError("Element is missing end tag.\n "+strNtransfromN2(tipValue.slice(0, index) + tipIconRepeat(start.start.column + node.tag.length) + "\n" + tipValue.slice(index))))
+    jsConsole.warn(new SyntaxError("Element is missing end tag.\n " + strNtransfromN2(tipValue.slice(0, index) + tipIconRepeat(start.start.column + node.tag.length) + "\n" + tipValue.slice(index))))
 }
 
 export function parseStrNextN(str, startIndex, lineNum = 2) {

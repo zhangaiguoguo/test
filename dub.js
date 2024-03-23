@@ -1,4 +1,4 @@
-import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag, isEndTag, warnLog, warnLog2, warnNotStartTag, reverseOrderLoopFindTarget, warnLog3, warnNotEndTag } from "./utils.js"
+import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag, isEndTag, warnLog, warnLog2, warnNotStartTag, reverseOrderLoopFindTarget, warnLog3, warnNotEndTag, attrWarnLog } from "./utils.js"
 function createParserContext(
     content,
     rawOptions,
@@ -221,8 +221,8 @@ function parseElement(context, ancestors) {
     parseElementFilter(context, ancestors, tagName, tag)
     const node = ancestorsPush(context, ancestors, tagName)
     advanceBy(context, tagName.length + 1);
-    const parseTagPo = parseTag(context)
-    const endIndex = parseTagPo[1]
+    parseAttrs(context, ancestors)
+    const endIndex = /(\/?>)/.exec(context.source);
     let tagContext = context.source.slice(0, endIndex?.index + endIndex[0].length);
     let isSingleLabel = false
     if (tagContext[tagContext.length - 1] === ">") {
@@ -230,7 +230,6 @@ function parseElement(context, ancestors) {
     }
     tagContext = tagContext.slice(0, isSingleLabel ? -2 : -1)
     node.props.source = valideStrIndex0IsS(tagContext) ? tagContext.slice(1) : tagContext
-    parseAttrs(context, ancestors)
     advanceBy(context, tagContext.length + (isSingleLabel ? 2 : 1));
     node.loc.start.end = getCursor(context)
     if (isSingleLabel) {
@@ -253,60 +252,72 @@ function valideStrIndex0IsS(str) {
 
 function parseAttrs(context, ancestors) {
     const currentNode = last(ancestors)
-    const props = currentNode.props
-    ancestors.at(-1).props.attrs = parseAttrs$(context, props.source);
+    ancestors.at(-1).props.attrs = parseAttrs$(context, currentNode);
 }
 
-function parseAttrs$(context, str) {
-    if (str) {
-        let attrs = []
-        let limitation = 0
-        let offset = context.offset
-        let line = context.line
-        while (str) {
-            if (limitation > 100000) break
-            let startIndex = str.indexOf(" ")
-            let endIndex = startIndex
-            startIndex = startIndex === -1 ? 0 : startIndex
-            const ec = /(?!(=("|'|`)))=("|'|`)(.*?)("|'|`)\s/ms.exec(str);
-            console.log(ec,str);
-            if (ec) {
-                if (ec.index > startIndex && startIndex) {
-                    //TODO
-                } else {
-                    endIndex = ec.index + ec[0].length
-                }
-            } else {
-                endIndex = str.length
-            }
-            const attrValue = slice(str, 0, endIndex);
-            let splitIndex = attrValue.indexOf("=")
-            attrs.push({
-                attrKey: splitIndex === -1 ? attrValue : attrValue.slice(0, splitIndex),
-                attrValue: splitIndex === -1 ? "" : attrValue.slice(splitIndex + 2, reverseOrderLoopFindTarget(attrValue, attrValue[splitIndex + 1]) + 1),
-                source: attrValue,
-                loc: {
-                    start: {
-                        offset: offset,
-                        line, column: offset - context.offset
-                    },
-                }
-            })
-            for (let w of attrValue) {
-                if (w === "\n") {
-                    line++
-                }
-            }
-            offset += endIndex
-            attrs.at(-1).loc.end = {
-                offset: offset,
-                line, column: offset - context.offset
-            }
-            str = slice(str, endIndex).trim()
-            limitation++
+function isTagStartEndLabel(context) {
+    let len = 0
+    while (len < context.source.length) {
+        const current = context.source[len]
+        if (current !== " ") {
+            return (current === "/" || current === ">")
         }
-        return attrs
+        len++
     }
+}
+
+function parseAttrs$(context, node) {
+    let attrs = []
+    const reg = /([^\s]+)=(["|'|`]?)|([^\s\/>]+\s?)/mg;
+    let result = null
+    while (!isTagStartEndLabel(context)) {
+        const s = context.source
+        const index = s.indexOf("="), index2 = /(\/?>)/.exec(s), index3 = s.indexOf(" ");
+        let match = null
+        let endIndex = index
+        if (index3 === 0) {
+            match = s.slice(0, index3)
+            if (!match.trim()) {
+                advanceBy(context, 1)
+                continue
+            }
+        }
+        if (index > index2.index) {
+            if (index3 > -1 && index3 < index2.index) {
+                endIndex = index3
+            } else {
+                endIndex = index2.index
+            }
+            match = s.slice(0, endIndex)
+        } else {
+            const symbol = s[index + 1]
+            if (isSpecialSymbols(symbol)) {
+                let n = 0
+                let i = 0
+                while (n < 2 && i < s.length) {
+                    if (s[i] === symbol) {
+                        n++
+                    }
+                    i++
+                }
+                endIndex = i
+            } else {
+                endIndex = /([\s\/\>]{1})/.exec(s)?.index || s.length;
+            }
+            match = s.slice(0, endIndex)
+        }
+        useParseAttr(context, match, attrs, node)
+        // break
+    }
+    return attrs
+}
+
+function isSpecialSymbols(v) {
+    return v.charCodeAt() === 96 || v.charCodeAt() === 39 || v.charCodeAt() === 34
+}
+
+function useParseAttr(context, value, attrs, node) {
+    advanceBy(context, value.length)
 }
 
 function parseText(context, ancestors) {
