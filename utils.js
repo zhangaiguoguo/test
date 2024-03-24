@@ -173,13 +173,13 @@ export function reverseOrderLoopFindTarget(str, target, targetNum = 1) {
 
 export const TIPWARNNLINE = 10
 
-export function attrWarnLog(context, current, preCurrent, value,node) {
+export function attrWarnLog(context, current, preCurrent, value, node) {
     const os = context.originalSource
     const a = os.slice(0, current.loc.end.offset)
     const subIndex = [getStrLastN(a, a.length - 1, 0) + 2]
     const subValue = [a.slice(subIndex[0])]
-    const endTipString = subValue[0] + '\n| ' + tipIconRepeat(subValue[0].length - 1)
-    const error = new SyntaxError(`<${node.tag}> tag attribute (${value.trim()}) already exists\n\t (at ${current.loc.start.line}:${current.loc.start.column + 2})\n `+a.slice(0, subIndex[0] + 1) + endTipString)
+    const endTipString = subValue[0] + '\n| ' + tipIconRepeat(current.loc.start.column - 1)
+    const error = new SyntaxError(`<${node.tag}> tag attribute (${value.trim()}) already exists\n\t (at ${current.loc.start.line}:${current.loc.start.column})\n ` + a.slice(0, subIndex[0] + 1) + endTipString)
     jsConsole.warn(error)
 }
 
