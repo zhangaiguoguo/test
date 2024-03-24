@@ -264,7 +264,7 @@ function specialLabelProcessing(context, ancestors) {
                 csLength--
             }
             if (flag) {
-                node.content = cs
+                node.nodeValue = cs
                 advanceBy(context, cs.length)
                 break
             }
@@ -272,9 +272,9 @@ function specialLabelProcessing(context, ancestors) {
     } else if (node.tag === "script") {
         const matchExec = /(<\/script>)/mg
         let match = matchExec.exec(s)
-        if(match){
+        if (match) {
             const cs = s.slice(0, match.index)
-            node.content = cs;
+            node.nodeValue = cs;
             advanceBy(context, cs.length)
         }
     }
@@ -444,4 +444,25 @@ function ancestorsPush(context, ancestors, tagName) {
             }
         }
     })) - 1]
+}
+
+export function transform$(baseNodes, fn) {
+    const nodes = transFormArray(baseNodes)
+    const cNodes = []
+
+    for (let i = 0; i < nodes.length; i++) {
+        const node = fn(nodes[i])
+        if (nodes[i].children && nodes[i].children.length) {
+            if (nodes[i].tag !== "style" && nodes[i].tag !== "script") {
+                node.children = transform$(nodes[i].children, fn)
+            }
+        }
+        cNodes.push(node)
+    }
+    return cNodes
+}
+
+export function transform(baseNodes, transform) {
+    if (!transform) return
+    return transform$(baseNodes, transform)
 }

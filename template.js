@@ -1,80 +1,97 @@
 export function template() {
-    return `
+  return `
 
-    <!DOCTYPE html>
-    <html lang="en">
-    
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Document</title>
-      <style>
-        body {}
-    
-        /* /* style*/
-      </style>
-    </head>
-    
-    <body class="body">
-      <!-- 
-          div
-    
-        -->
-    </body>
-    <script src="./index.js"></script>
-    <script src="./parseTag.js"></script>
-    <script src="./pinia.js">
-    </script>
-    <script>
-    
-      // console.log(hooks);
-      // console.log(pinia)
-      // pinia.installReactiveHooks(hooks)
-      // pinia.createPinia()
-      // const stateStore = pinia.defineStore('state',{
-      //   state(){
-      //     return {
-      //       num:1
-      //     }
-      //   },
-      //   getters:{
-    
-      //   },
-      //   actions:{
-    
-      //   }
-      // })
-    
-      '<\\/script>'
-    
-      // console.log(stateStore);
-    
-      //<\\/script>
-    
-      /**
-       *
-       * @param item <\\/script>
-       * @param list
-       * @param index
-       * @param info
-       */
-    </script>
-    <script type="module">
-      import { template } from "./template.js"
-      import { baseParse } from "./parseTemplate.js"
-      const startDate = Date.now()
-      try {
-        console.log(baseParse(template()));
-        console.log(Date.now() - startDate);
-      } catch (err) {
-        console.warn(err)
-      }
-    
-    
-    </script>
-    
-    </html>
+      <div class="root-div" a b c>
+        <!-- 你好 -->
+        <p>你好</p>
+        <input class="root-input" value="input value"/>
+        <button class="root-btn">点击</button>
+        <div>
+          你好 -> div
+        </div>
+        <style>
+          .root-div{
+            line-height:2;
+          }
+        </style>
+        <script>
 
+          const num = hooks.ref(1)
+          
+          hooks.watch(num,(v)=>{
+            $("input.root-input").val(v)
+          })
+
+          $("input.root-input").on('input',({target})=>{
+            num.value = target.value
+          })
+
+          $('button.root-btn').click(({target})=>{
+            num.value +=1
+            console.log("<\\/script>")
+          })
+          
+          //<\\/script>
+
+          /*
+          
+            <//script>
+
+          */
+
+        </script>
+      </div>
 
     `
+}
+
+
+export function template2() {
+  return `
+
+        <div class="root-div" a b a1 c>
+        <!-- 你好 -->
+        <p>你好</p>
+        <div>
+          <p>你好</p>
+        </div>
+        <input class="root-input" value="input value"/>
+        <div>
+          <button a class="root-btn">点击</button>
+          你好 -> div
+        </div>
+        <style>
+          .root-div{
+            line-height:2;
+          }
+        </style>
+        <script>
+
+          const num = hooks.ref(1)
+          
+          hooks.watch(num,(v)=>{
+            $("input.root-input").val(v)
+          })
+
+          $("input.root-input").on('input',({target})=>{
+            num.value = target.value
+          })
+
+          $('button.root-btn').click(({target})=>{
+            num.value +=1
+            console.log("<\\/script>")
+          })
+          
+          //<\\/script>
+
+          /*
+          
+            <//script>
+
+          */
+
+        </script>
+      </div>
+  
+  `
 }
