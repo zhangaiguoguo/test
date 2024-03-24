@@ -233,12 +233,51 @@ function parseElement(context, ancestors) {
     node.loc.start.end = getCursor(context)
     if (isSingleLabel) {
         ancestors.pop()
+    } else {
+        specialLabelProcessing(context, ancestors)
     }
     if (parent) {
         parent.children.push(node);
         return
     }
     return node
+}
+
+function specialLabelProcessing(context, ancestors) {
+    const node = last(ancestors)
+    const s = context.source
+    if (node.tag === "style") {
+        let match = null
+        const matchExec = /(<\/style>)/mg
+        while ((match = matchExec.exec(s)) && s) {
+            const cs = s.slice(0, match.index)
+            let csLength = cs.length - 1
+            let flag = true
+            while (csLength) {
+                if (cs[csLength] === "*" && cs[csLength + 1] === "/") {
+                    break
+                }
+                if (cs[csLength] === "*" && cs[csLength - 1] === "/") {
+                    flag = false
+                    break
+                }
+                csLength--
+            }
+            if (flag) {
+                node.content = cs
+                advanceBy(context, cs.length)
+                break
+            }
+        }
+    } else if (node.tag === "script") {
+        const matchExec = /(<\/script>)/mg
+        let match = matchExec.exec(s)
+        if(match){
+            const cs = s.slice(0, match.index)
+            node.content = cs;
+            advanceBy(context, cs.length)
+        }
+    }
 }
 
 function valideStrIndex0IsS(str) {
