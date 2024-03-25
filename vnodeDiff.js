@@ -289,15 +289,10 @@
           vNodeCompareDiffRun(children, node.children, node.el)
         }
       }
-    }else{
+    } else if (!vnode.length && rnode.length) {
+      
+    } else {
       console.log(arguments);
-    }
-  }
-
-  function removeChild(rnodeChildren, index) {
-    const rnode = synthesisArray(rnodeChildren).slice(index, 1)[0]
-    if (rnode && rnode.el) {
-      rnode.el.remove()
     }
   }
 

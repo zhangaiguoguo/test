@@ -1,4 +1,4 @@
-import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, slice, sliceMerge, parseTag, isEndTag, warnLog, warnLog2, warnNotStartTag, reverseOrderLoopFindTarget, warnLog3, warnNotEndTag, attrWarnLog } from "./utils.js"
+import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, isEndTag, warnLog, warnLog2, warnNotStartTag, warnLog3, warnNotEndTag, attrWarnLog } from "./utils.js"
 function createParserContext(
     content,
     rawOptions,
