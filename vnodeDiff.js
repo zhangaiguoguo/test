@@ -290,7 +290,9 @@
         }
       }
     } else if (!vnode.length && rnode.length) {
-      
+      for (let i = 0; i < rnode.length; i++) {
+        rnode[i].el.remove()
+      }
     } else {
       console.log(arguments);
     }
