@@ -1,6 +1,7 @@
 export function template() {
   return `
-      <button click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
+      <button class="a" click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
+      <p>你好</p>
       <div class="root-div" a b c>
         <!-- 你好 -->
         <p>你好</p>
@@ -42,7 +43,6 @@ export function template() {
 
 export function template2() {
   return `
-
         <div class="root-div" a b a1 c>
         <!-- 你好 -->
         <p>你好</p>
@@ -86,7 +86,7 @@ export function template2() {
 
         </script>
       </div>
-  
+      <p>你好</p>
   `
 }
 

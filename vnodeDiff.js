@@ -275,30 +275,94 @@
     return _keys(target)
   }
 
-  const DIFFCHILDRENLENGTH = 100001;
-  const DIFFCHILDRENTREE = 100010;
-  const DIFFNODETAG = 100100;
-  const DIFFNODEATTRLENGTH = 101000;
-  const DIFFNODEATTRS = 110000;
+  const DIFFCHILDRENLENGTH = 0b000001;
+  const DIFFCHILDRENTREE = 0b000010;
+  const DIFFNODETAG = 0b000100;
+  const DIFFNODEATTRLENGTH = 0b001000;
+  const DIFFNODEATTRS = 0b010000;
+  const DIFFTAGTYPE = 0b10000;
   class DirrStore {
     didUseState = []
+    useState = []
+    perms = [0b011111, 0b111101, 0b111111]
     constructor() {
 
+    }
+    push2(n1, n2, count) {
+      this.useState.push({ n1, n2, count });
     }
     push(node) {
       this.didUseState.push(node)
     }
-    diff(n1, n2, prem = 111111) {
+    diff(n1, n2, perm = this.perms[0]) {
       let count = 0
+      if (!n2) return count
       const setCount = () => count++
-      if (n1.tag === n2.tag) {
+      if (n1.tag === n2.tag && (perm & DIFFNODETAG) === DIFFNODETAG) {
         setCount()
       }
-      if (n1.children && n2.children && n1.children.length === n2.children.length) {
-        setCount()
+      if (n2.attrs && n1.attrs && (perm & DIFFNODEATTRS) === DIFFNODEATTRS) {
+        const ks = []
+        for (let k in n1.attrs) {
+          if ((k) in n2.attrs) {
+            setCount()
+          }
+          if (n1.attrs[k] === n2.attrs[k]) {
+            setCount()
+          }
+          ks.push(k)
+        }
+        if (((perm & DIFFNODEATTRLENGTH) === DIFFNODEATTRLENGTH) && ks.length === keys(n2.attrs).length) {
+          setCount()
+        }
+      }
+      if (n1.children && n2.children) {
+        if (n1.children.length === n2.children.length && (perm & DIFFCHILDRENLENGTH) === DIFFCHILDRENLENGTH) {
+          setCount()
+        }
+        if ((perm & DIFFCHILDRENTREE) === DIFFCHILDRENTREE) {
+          for (let i = 0; i < n1.children.length; i++) {
+            count += this.diff(n1.children[i], n2.children[i], this.perms[1])
+          }
+        }
       }
 
       return count
+    }
+    diff2() {
+      const currentDiff = this.useState.at(-1)
+      if (!currentDiff) return
+      if (this.didUseState.length) {
+        for (let i = 0; i < this.didUseState.length; i++) {
+          const didn = this.didUseState[i]
+          const count = this.diff(currentDiff.n1, didn)
+          if (count > currentDiff.count && count) {
+            this.didUseState.splice(i, 1, currentDiff.n2)
+            currentDiff.n2 = didn
+            currentDiff.count = count
+          }
+        }
+      }
+      if (this.useState.length > 1) {
+        for (let i = this.useState.length - 2; i >= 0; i--) {
+          const un = this.useState[i];
+          if (un.n2) {
+            const count = this.diff(currentDiff.n1, un.n2)
+            if (count > 0 && count > un.count) {
+              console.log("1");
+              // currentDiff.count = count
+              // currentDiff.n2 = un.n2;
+            }
+          }
+          if (currentDiff.n2) {
+            const count = this.diff(un.n1, currentDiff.n2)
+            console.log(count, currentDiff);
+            if (count > 0 && count > currentDiff.count) {
+              console.log("2");
+            }
+          }
+        }
+      }
     }
   }
 
@@ -323,18 +387,27 @@
         i--
       }
     } else {
+      const startTime = Date.now()
+      const diffStore = new DirrStore()
       for (let index = 0; index < vnode.length; index++) {
         const n1 = vnode[index];
         const n2 = rnode[index];
-        const diffStore = new DirrStore()
         if (getNodeRefType(n1) !== getNodeRefType(n2)) {
           console.log("type not");
           diffStore.push(n2)
         } else if (n1.tag !== n2.tag) {
-          console.log(diffStore.diff(n1, n2));
+          const count = diffStore.diff(n1, n2)
+          let crn2 = n2
+          if (count === 0) {
+            diffStore.push(n2)
+            crn2 = null
+          }
+          diffStore.push2(n1, crn2, count)
+          diffStore.diff2();
         }
-        console.log(diffStore);
       }
+      console.log(diffStore);
+      console.log("耗时:", Date.now() - startTime);
     }
   }
 
