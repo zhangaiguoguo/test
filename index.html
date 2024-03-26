@@ -1,53 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-  </head>
 
-  <body class="body">
-    <div id="root"></div>
-    <button class="switch">点击切换</button>
-  </body>
-  <script src="./jquery.js"></script>
-  <script src="./index.js"></script>
-  <script src="./pinia.js"></script>
-  <script type="module">
-    import { template, template2 } from "./template.js";
-    import { baseParse, transform } from "./parseTemplate.js";
-    import "./vnodeDiff.js";
-    const { render, transform: transform2 } = vnodeHooks;
-    const vnode = transform(baseParse(template()), transform2);
-    const vnode2 = transform(baseParse(template2()), transform2);
-    // console.log(vnode, vnode2);
-    const nodes = render(vnode, null);
-    for (let w of nodes) {
-      $("#root")[0].appendChild(w.el);
-    }
-    $("button.switch").click(() => {
-      render(vnode2,nodes)
-    });
-  </script>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document</title>
+</head>
 
-  <script>
-    // console.log(hooks);
-    // console.log(pinia)
-    // pinia.installReactiveHooks(hooks)
-    // pinia.createPinia()
-    // const stateStore = pinia.defineStore('state',{
-    //   state(){
-    //     return {
-    //       num:1
-    //     }
-    //   },
-    //   getters:{
+<body class="body">
+  <div id="root"></div>
+  <button class="switch">点击切换</button>
+  <button class="switch2">点击切换2</button>
+  <button class="switch3">点击切换3(null)</button>
+</body>
+<script src="./jquery.js"></script>
+<script src="./index.js"></script>
+<script src="./pinia.js"></script>
+<script type="module">
+  import { template, template2, template3 } from "./template.js";
+  import { baseParse, transform } from "./parseTemplate.js";
+  import "./vnodeDiff.js";
+  const { render, transform: transform2 } = vnodeHooks;
+  const vnode = transform(baseParse(template()), transform2);
+  const vnode2 = transform(baseParse(template2()), transform2);
+  const vnode3 = transform(baseParse(template3()), transform2);
+  // console.log(vnode, vnode2);
+  const renderRun = render($("#root")[0], vnode);
+  $("button.switch").click(() => {
+    renderRun(vnode)
+  });
+  $("button.switch2").click(() => {
+    renderRun(vnode2)
+  });
+  $("button.switch3").click(() => {
+    renderRun(vnode3)
+  })
 
-    //   },
-    //   actions:{
+</script>
 
-    //   }
-    // })
-    // console.log(stateStore);
-  </script>
+<script>
+  // console.log(hooks);
+  // console.log(pinia)
+  // pinia.installReactiveHooks(hooks)
+  // pinia.createPinia()
+  // const stateStore = pinia.defineStore('state',{
+  //   state(){
+  //     return {
+  //       num:1
+  //     }
+  //   },
+  //   getters:{
+
+  //   },
+  //   actions:{
+
+  //   }
+  // })
+  // console.log(stateStore);
+</script>
+
 </html>

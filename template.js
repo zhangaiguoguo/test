@@ -1,6 +1,6 @@
 export function template() {
   return `
-
+      <button click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
       <div class="root-div" a b c>
         <!-- 你好 -->
         <p>你好</p>
@@ -16,7 +16,8 @@ export function template() {
         </style>
         <script>
 
-          const num = hooks.ref(1)
+          {
+            const num = hooks.ref(1)
           
           hooks.watch(num,(v)=>{
             $("input.root-input").val(v)
@@ -30,14 +31,7 @@ export function template() {
             num.value +=1
             console.log("<\\/script>")
           })
-          
-          //<\\/script>
-
-          /*
-          
-            <//script>
-
-          */
+          }
 
         </script>
       </div>
@@ -94,4 +88,8 @@ export function template2() {
       </div>
   
   `
+}
+
+export function template3(){
+  return ``
 }

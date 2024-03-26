@@ -1,0 +1,74 @@
+[
+	{
+		"loc": {
+			"start": {
+				"start": {
+					"column": 1,
+					"line": 1,
+					"offset": 0
+				},
+				"end": {
+					"column": 10,
+					"line": 1,
+					"offset": 9
+				}
+			},
+			"end": {
+				"start": {
+					"column": 10,
+					"line": 1,
+					"offset": 9
+				},
+				"end": {
+					"column": 16,
+					"line": 1,
+					"offset": 15
+				}
+			}
+		},
+		"type": 1,
+		"props": {
+			"source": " a a",
+			"attrs": [
+				{
+					"nodeName": "a",
+					"nodeValue": "",
+					"type": 2,
+					"source": "a",
+					"loc": {
+						"start": {
+							"column": 6,
+							"line": 1,
+							"offset": 5
+						},
+						"end": {
+							"column": 7,
+							"line": 1,
+							"offset": 6
+						}
+					}
+				},
+				{
+					"nodeName": "a",
+					"nodeValue": "",
+					"type": 2,
+					"source": "a",
+					"loc": {
+						"start": {
+							"column": 8,
+							"line": 1,
+							"offset": 7
+						},
+						"end": {
+							"column": 9,
+							"line": 1,
+							"offset": 8
+						}
+					}
+				}
+			]
+		},
+		"children": [],
+		"tag": "div"
+	}
+]

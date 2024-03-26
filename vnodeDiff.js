@@ -246,10 +246,10 @@
     return Array.isArray(target) ? target : [target]
   }
 
-  function vNodeCompareDiff(vnode, rnode) {
+  function vNodeCompareDiff(dom, vnode, rnode) {
     const vnodes = transFormArray(vnode)
     const rnodes = transFormArray(rnode).filter(Boolean)
-    vNodeCompareDiffRun(vnodes, rnodes, null);
+    vNodeCompareDiffRun(vnodes, rnodes, dom);
     return rnodes
   }
 
@@ -275,6 +275,33 @@
     return _keys(target)
   }
 
+  const DIFFCHILDRENLENGTH = 100001;
+  const DIFFCHILDRENTREE = 100010;
+  const DIFFNODETAG = 100100;
+  const DIFFNODEATTRLENGTH = 101000;
+  const DIFFNODEATTRS = 110000;
+  class DirrStore {
+    didUseState = []
+    constructor() {
+
+    }
+    push(node) {
+      this.didUseState.push(node)
+    }
+    diff(n1, n2, prem = 111111) {
+      let count = 0
+      const setCount = () => count++
+      if (n1.tag === n2.tag) {
+        setCount()
+      }
+      if (n1.children && n2.children && n1.children.length === n2.children.length) {
+        setCount()
+      }
+
+      return count
+    }
+  }
+
   function vNodeCompareDiffRun(vnode, rnode, parent) {
     if (!rnode.length && vnode.length) {
       for (let i = 0; i < vnode.length; i++) {
@@ -291,10 +318,30 @@
       }
     } else if (!vnode.length && rnode.length) {
       for (let i = 0; i < rnode.length; i++) {
-        rnode[i].el.remove()
+        removeNode(rnode[i])
+        rnode.splice(i, 1)
+        i--
       }
     } else {
-      console.log(arguments);
+      for (let index = 0; index < vnode.length; index++) {
+        const n1 = vnode[index];
+        const n2 = rnode[index];
+        const diffStore = new DirrStore()
+        if (getNodeRefType(n1) !== getNodeRefType(n2)) {
+          console.log("type not");
+          diffStore.push(n2)
+        } else if (n1.tag !== n2.tag) {
+          console.log(diffStore.diff(n1, n2));
+        }
+        console.log(diffStore);
+      }
+    }
+  }
+
+  function removeNode(node) {
+    if (node) {
+      const el = node.el instanceof Node ? node.el : node;
+      el.remove()
     }
   }
 
@@ -305,7 +352,15 @@
   return {
     h: createVnode,
     parseNodeTree,
-    render: vNodeCompareDiff,
+    render: (dom, _vnode) => {
+      let rnode = null
+      function render(vnode) {
+        console.log(vnode);
+        return (rnode = vNodeCompareDiff(dom, vnode || [], rnode));
+      }
+      _vnode && render(_vnode)
+      return render
+    },
     transform(node) {
       let attrs$;
       const flag = node.type !== 3 && node.type !== 8 && node.type !== "DOCTYPE" && node.type !== "CDATA"
