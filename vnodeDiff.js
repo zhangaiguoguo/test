@@ -351,7 +351,7 @@
             }
           }
           index--
-        }
+        };
         for (let i2 = i + 1; i2 < this.useState.length; i2++) {
           const usn2 = this.useState[i2];
           const [a, b] = [usn.n2, usn2.n2]
