@@ -288,10 +288,9 @@
     constructor() {
 
     }
-    flag = false
-    push2(n1, n2, count) {
-      this.flag = true
-      this.useState.push({ n1, n2, count });
+    counts = []
+    push2(n1, n2, count, index) {
+      this.useState.push({ n1, n2, count, index });
     }
     push(...args) {
       transFormArray(args).flat().forEach((node) => {
@@ -299,6 +298,10 @@
       })
     }
     diff(n1, n2, perm = DirrStore.perms[2]) {
+      const cCount = this.counts.find((ii) => ii.n1 === n1 && ii.n2 === n2)
+      if (cCount) {
+        return cCount.count
+      }
       let count = 0
       if (!n2) return count
       if (getNodeRefType(n1) === getNodeRefType(n2) && (perm & DIFFTAGTYPE) === DIFFTAGTYPE) {
@@ -318,7 +321,8 @@
           }
           ks.push(k)
         }
-        if (((perm & DIFFNODEATTRLENGTH) === DIFFNODEATTRLENGTH) && ks.length === keys(n2.attrs).length) {
+        const ks2 = keys(n2.attrs)
+        if (((perm & DIFFNODEATTRLENGTH) === DIFFNODEATTRLENGTH) && ks.length === ks2.length) {
           count++
         }
       }
@@ -332,62 +336,55 @@
           }
         }
       }
-
+      this.counts.push({
+        n1, n2, count
+      })
       return count
     }
-    diff2() {
-      for (let i = 0; i < this.useState.length; i++) {
-        const usn = this.useState[i];
-        let index = this.didUseState.length - 1
-        while (index >= 0) {
-          const didn = this.didUseState[index]
-          if (didn) {
-            const count = this.diff(usn.n1, didn)
-            if (count >= usn.count && count) {
-              console.log(count, usn.count, usn.n1, didn, usn.n2);
-              usn.count = count
-              this.didUseState.splice(index, 1, usn.n2)
-              usn.n2 = didn
-            }
+    diff2(un) {
+      for (let i = 0; i < this.didUseState.length; i++) {
+        const dn = this.didUseState[i]
+        const cCount = this._diff(un.n1, dn, un.count)
+        if (cCount !== false) {
+          const n2 = un.n2
+          if (n2) {
+            this.didUseState[i] = n2
+          } else {
+            this.didUseState.splice(i, 1)
+            i--
           }
-          index--
-        };
-        for (let i2 = i + 1; i2 < this.useState.length; i2++) {
-          const usn2 = this.useState[i2];
-          const [a, b] = [usn.n2, usn2.n2]
-          const hooks = []
-          const flags = []
-          {
-            const count = this.diff(usn.n1, usn2.n2)
-            if (count >= usn.count && count) {
-              hooks.push(() => {
-                usn.count = count
-                usn2.n2 = a
-                usn.n2 = b
-              })
-              flags[0] = count
-            }
-          }
-          {
-            const count = this.diff(usn2.n1, usn.n2)
-            if (count >= usn.count && count) {
-              hooks.push(() => {
-                usn2.count = count
-                usn2.n2 = a
-                usn.n2 = b
-              })
-              flags[1] = count
-            }
-          }
-          if (flags.length) {
-            if (flags.length > 1 && flags[0] < flags[1]) {
-              hooks[1]()
-            } else {
-              hooks[0]()
-            }
-            hooks.splice(0, hooks.length)
-          }
+          un.count = cCount
+          un.n2 = dn
         }
+      }
+    }
+    _diff(n1, n2, _count = 0) {
+      const count = this.diff(n1, n2)
+      if (count > _count || (count === _count && n1.tag === n2.tag)) {
+        return count
+      }
+      return false
+    }
+    diff3(n) {
+      let index = null
+      for (let i = this.useState.length - 1; i >= 0; i--) {
+        const cn = this.useState[i];
+        const count = this.diff(cn.n1, n)
+        if (count > cn.count || (count === cn.count && cn.tag === n.tag)) {
+          index = [i, count]
+        }
+      }
+      if (index !== null) {
+        const cn = this.useState[index[0]];
+        const cn2 = cn.n2
+        cn.n2 = n;
+        cn.count = index[1]
+        if (cn2) {
+          this.diff3(cn2)
+        }
+        return true
+      } else {
+        this.didUseState.push(n)
       }
     }
   }
@@ -417,28 +414,40 @@
       const diffStore = new DirrStore()
       let index = 0;
       if (rnode.length > vnode.length) {
-        diffStore.push(rnode.slice(rnode.length - 1))
+        diffStore.push(rnode.slice(vnode.length))
       }
       for (index; index < vnode.length; index++) {
-        const n1 = vnode[index];
-        const n2 = rnode[index] || {};
+        var n1 = vnode[index];
+        var n2 = rnode[index]
+        n1.index = index
+        n2.index = index
+        // console.log("loop in ",n1,n2);
         const count = diffStore.diff(n1, n2)
-        if (n1.tag !== n2.tag) {
-          let crn2 = n2
-          if (count === 0) {
-            diffStore.push(n2)
-            crn2 = null
-          }
-          diffStore.push2(n1, crn2, count)
-        } else {
-          diffStore.push2(n1, n2, count)
+        if (n2 && (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2))) {
+          diffStore.diff3(n2)
+          n2 = null
         }
-        // console.log('loop', n1, n2);
-        diffStore.diff2();
+        diffStore.push2(n1, n2, count, index)
+        diffStore.diff2(diffStore.useState.at(-1));
       }
-      console.log(diffStore);
+      runDiffStore(diffStore, vnode, rnode)
       console.log("耗时:", Date.now() - startTime);
     }
+  }
+
+  function runDiffStore(diffStore, n1, n2) {
+    console.log(diffStore);
+    const didUseState = diffStore.didUseState
+    for (let i = 0; i < didUseState.length; i++) {
+      if (didUseState[i] && didUseState[i].el) {
+        didUseState[i].el.remove()
+        n2.splice(didUseState[i].index, 1)
+      }
+      didUseState.splice(i, 1)
+      i--
+    }
+    const useState = diffStore.useState
+    console.log(useState);
   }
 
   function removeNode(node) {
@@ -458,8 +467,9 @@
     render: (dom, _vnode) => {
       let rnode = null
       function render(vnode) {
-        console.log(vnode);
-        return (rnode = vNodeCompareDiff(dom, vnode || [], rnode));
+        const result = vNodeCompareDiff(dom, vnode || [], rnode)
+        console.log(result);
+        return (rnode = result);
       }
       _vnode && render(_vnode)
       return render
