@@ -277,52 +277,58 @@
 
   const DIFFCHILDRENLENGTH = 0b000001;
   const DIFFCHILDRENTREE = 0b000010;
-  const DIFFNODETAG = 0b000100;
-  const DIFFNODEATTRLENGTH = 0b001000;
-  const DIFFNODEATTRS = 0b010000;
-  const DIFFTAGTYPE = 0b10000;
+  const DIFFNODEATTRLENGTH = 0b000100;
+  const DIFFNODEATTRS = 0b001000;
+  const DIFFNODETAG = 0b0100000;
+  const DIFFTAGTYPE = 0b1000000;
   class DirrStore {
     didUseState = []
     useState = []
-    perms = [0b011111, 0b111101, 0b111111]
+    static perms = [0b111111, 0b111101, 0b111111]
     constructor() {
 
     }
+    flag = false
     push2(n1, n2, count) {
+      this.flag = true
       this.useState.push({ n1, n2, count });
     }
-    push(node) {
-      this.didUseState.push(node)
+    push(...args) {
+      transFormArray(args).flat().forEach((node) => {
+        this.didUseState.push(node)
+      })
     }
-    diff(n1, n2, perm = this.perms[0]) {
+    diff(n1, n2, perm = DirrStore.perms[2]) {
       let count = 0
       if (!n2) return count
-      const setCount = () => count++
+      if (getNodeRefType(n1) === getNodeRefType(n2) && (perm & DIFFTAGTYPE) === DIFFTAGTYPE) {
+        count += DIFFTAGTYPE
+      }
       if (n1.tag === n2.tag && (perm & DIFFNODETAG) === DIFFNODETAG) {
-        setCount()
+        count += DIFFNODETAG
       }
       if (n2.attrs && n1.attrs && (perm & DIFFNODEATTRS) === DIFFNODEATTRS) {
         const ks = []
         for (let k in n1.attrs) {
           if ((k) in n2.attrs) {
-            setCount()
+            count++
           }
           if (n1.attrs[k] === n2.attrs[k]) {
-            setCount()
+            count++
           }
           ks.push(k)
         }
         if (((perm & DIFFNODEATTRLENGTH) === DIFFNODEATTRLENGTH) && ks.length === keys(n2.attrs).length) {
-          setCount()
+          count++
         }
       }
       if (n1.children && n2.children) {
         if (n1.children.length === n2.children.length && (perm & DIFFCHILDRENLENGTH) === DIFFCHILDRENLENGTH) {
-          setCount()
+          count++
         }
         if ((perm & DIFFCHILDRENTREE) === DIFFCHILDRENTREE) {
           for (let i = 0; i < n1.children.length; i++) {
-            count += this.diff(n1.children[i], n2.children[i], this.perms[1])
+            count += this.diff(n1.children[i], n2.children[i], DirrStore.perms[1])
           }
         }
       }
@@ -330,36 +336,56 @@
       return count
     }
     diff2() {
-      const currentDiff = this.useState.at(-1)
-      if (!currentDiff) return
-      if (this.didUseState.length) {
-        for (let i = 0; i < this.didUseState.length; i++) {
-          const didn = this.didUseState[i]
-          const count = this.diff(currentDiff.n1, didn)
-          if (count > currentDiff.count && count) {
-            this.didUseState.splice(i, 1, currentDiff.n2)
-            currentDiff.n2 = didn
-            currentDiff.count = count
+      for (let i = 0; i < this.useState.length; i++) {
+        const usn = this.useState[i];
+        let index = this.didUseState.length - 1
+        while (index >= 0) {
+          const didn = this.didUseState[index]
+          if (didn) {
+            const count = this.diff(usn.n1, didn)
+            if (count >= usn.count && count) {
+              console.log(count, usn.count, usn.n1, didn, usn.n2);
+              usn.count = count
+              this.didUseState.splice(index, 1, usn.n2)
+              usn.n2 = didn
+            }
           }
+          index--
         }
-      }
-      if (this.useState.length > 1) {
-        for (let i = this.useState.length - 2; i >= 0; i--) {
-          const un = this.useState[i];
-          if (un.n2) {
-            const count = this.diff(currentDiff.n1, un.n2)
-            if (count > 0 && count > un.count) {
-              console.log("1");
-              // currentDiff.count = count
-              // currentDiff.n2 = un.n2;
+        for (let i2 = i + 1; i2 < this.useState.length; i2++) {
+          const usn2 = this.useState[i2];
+          const [a, b] = [usn.n2, usn2.n2]
+          const hooks = []
+          const flags = []
+          {
+            const count = this.diff(usn.n1, usn2.n2)
+            if (count >= usn.count && count) {
+              hooks.push(() => {
+                usn.count = count
+                usn2.n2 = a
+                usn.n2 = b
+              })
+              flags[0] = count
             }
           }
-          if (currentDiff.n2) {
-            const count = this.diff(un.n1, currentDiff.n2)
-            console.log(count, currentDiff);
-            if (count > 0 && count > currentDiff.count) {
-              console.log("2");
+          {
+            const count = this.diff(usn2.n1, usn.n2)
+            if (count >= usn.count && count) {
+              hooks.push(() => {
+                usn2.count = count
+                usn2.n2 = a
+                usn.n2 = b
+              })
+              flags[1] = count
             }
+          }
+          if (flags.length) {
+            if (flags.length > 1 && flags[0] < flags[1]) {
+              hooks[1]()
+            } else {
+              hooks[0]()
+            }
+            hooks.splice(0, hooks.length)
           }
         }
       }
@@ -389,22 +415,26 @@
     } else {
       const startTime = Date.now()
       const diffStore = new DirrStore()
-      for (let index = 0; index < vnode.length; index++) {
+      let index = 0;
+      if (rnode.length > vnode.length) {
+        diffStore.push(rnode.slice(rnode.length - 1))
+      }
+      for (index; index < vnode.length; index++) {
         const n1 = vnode[index];
-        const n2 = rnode[index];
-        if (getNodeRefType(n1) !== getNodeRefType(n2)) {
-          console.log("type not");
-          diffStore.push(n2)
-        } else if (n1.tag !== n2.tag) {
-          const count = diffStore.diff(n1, n2)
+        const n2 = rnode[index] || {};
+        const count = diffStore.diff(n1, n2)
+        if (n1.tag !== n2.tag) {
           let crn2 = n2
           if (count === 0) {
             diffStore.push(n2)
             crn2 = null
           }
           diffStore.push2(n1, crn2, count)
-          diffStore.diff2();
+        } else {
+          diffStore.push2(n1, n2, count)
         }
+        // console.log('loop', n1, n2);
+        diffStore.diff2();
       }
       console.log(diffStore);
       console.log("耗时:", Date.now() - startTime);
