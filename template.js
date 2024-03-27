@@ -1,5 +1,6 @@
 export function template() {
   return `
+      <!-- <button class="a" click="onSwitch()">{{isOpen ? '关' : '开'}}</button> -->
       <button class="a" click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
       <p>你好</p>
       <div class="root-div" a b c>
@@ -36,7 +37,8 @@ export function template() {
 
         </script>
       </div>
-
+      <div>111</div>
+      <button class="a" b  click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
     `
 }
 
@@ -87,9 +89,12 @@ export function template2() {
         </script>
       </div>
       <p>你好</p>
+     <!-- <button class="a" click="onSwitch()">{{isOpen ? '关' : '开'}}</button> -->
+     <button class="a" b click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
+     <button class="a" click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
   `
 }
 
-export function template3(){
+export function template3() {
   return ``
 }
