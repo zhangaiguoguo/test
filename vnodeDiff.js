@@ -60,9 +60,13 @@
   const ELEMENT_NODE = Node.ELEMENT_NODE
   const COMMENT_NODE = Node.COMMENT_NODE
   const TEXTREF = createSymbol('text', TEXT_NODE)
+  const TEXTREF2 = TEXTREF[0]
   const ELEMENTREF = createSymbol('element', ELEMENT_NODE)
+  const ELEMENTREF2 = ELEMENTREF[0]
   const COMMENTREF = createSymbol('comment', COMMENT_NODE)
+  const COMMENTREF2 = COMMENTREF[0]
   const ELEMENTTYPE = createSymbol('elementType', null)
+  const ELEMENTTYPE2 = ELEMENTTYPE[0]
 
   function nodeTypeSymbolFind(target, done = false) {
     let flag = 1
@@ -237,7 +241,7 @@
       this.el = createRNode(this)
       setNodeAttrs(this.el, this.attrs)
     }
-    apped(parentNode) {
+    append(parentNode) {
       parentNode && parentNode.appendChild(this.el)
     }
   }
@@ -274,6 +278,10 @@
   function keys(target) {
     return _keys(target)
   }
+  const INIT_NODE_PERM = () => 0b0000000
+  const NODE_ATTR_SET = 0b0000001
+  const NODE_ATTR_ADD = 0b0000010
+  const NODE_ATTR_DEL = 0b0000100
 
   const DIFFCHILDRENLENGTH = 0b000001;
   const DIFFCHILDRENTREE = 0b000010;
@@ -297,12 +305,16 @@
         this.didUseState.push(node)
       })
     }
+    find(n1, n2) {
+      return this.counts.find((ii) => ii.n1 === n1 && ii.n2 === n2)
+    }
     diff(n1, n2, perm = DirrStore.perms[2]) {
-      const cCount = this.counts.find((ii) => ii.n1 === n1 && ii.n2 === n2)
+      const cCount = this.find(n1, n2)
       if (cCount) {
         return cCount.count
       }
       let count = 0
+      let CURRENT_NODE_PERM = INIT_NODE_PERM()
       if (!n2) return count
       if (getNodeRefType(n1) === getNodeRefType(n2) && (perm & DIFFTAGTYPE) === DIFFTAGTYPE) {
         count += DIFFTAGTYPE
@@ -312,18 +324,27 @@
       }
       if (n2.attrs && n1.attrs && (perm & DIFFNODEATTRS) === DIFFNODEATTRS) {
         const ks = []
+        let flag = false
         for (let k in n1.attrs) {
           if ((k) in n2.attrs) {
             count++
           }
           if (n1.attrs[k] === n2.attrs[k]) {
             count++
+          } else {
+            CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_SET
           }
           ks.push(k)
         }
         const ks2 = keys(n2.attrs)
         if (((perm & DIFFNODEATTRLENGTH) === DIFFNODEATTRLENGTH) && ks.length === ks2.length) {
           count++
+        } else {
+          if (ks.length > ks2.length) {
+            CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_ADD
+          } else {
+            CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_DEL
+          }
         }
       }
       if (n1.children && n2.children) {
@@ -337,7 +358,7 @@
         }
       }
       this.counts.push({
-        n1, n2, count
+        n1, n2, count, CURRENT_NODE_PERM
       })
       return count
     }
@@ -392,9 +413,10 @@
   function vNodeCompareDiffRun(vnode, rnode, parent) {
     if (!rnode.length && vnode.length) {
       for (let i = 0; i < vnode.length; i++) {
+        if (vnode[i] === null) continue
         const node = new VNode(typeof vnode[i] === 'string' ? createVnodeText(vnode[i]) : vnode[i])
         if (parent) {
-          node.apped(parent)
+          node.append(parent)
         }
         rnode.splice(i, 1, node)
         if (vnode[i].children && vnode[i].children.length) {
@@ -428,12 +450,12 @@
         diffStore.push2(n1, n2, count)
         diffStore.diff2(diffStore.useState.at(-1));
       }
-      runDiffStore(diffStore, vnode, rnode)
+      runDiffStore(diffStore, vnode, rnode, parent)
       console.log("耗时:", Date.now() - startTime);
     }
   }
 
-  function runDiffStore(diffStore, n1, n2) {
+  function runDiffStore(diffStore, n1, n2, parent) {
     const didUseState = diffStore.didUseState
     for (let i = 0; i < didUseState.length; i++) {
       if (didUseState[i] && didUseState[i].el) {
@@ -444,26 +466,49 @@
     didUseState.splice(0, didUseState.length)
     const useState = diffStore.useState
     const nodes = []
-    for (let ni = useState.length - 1; ni > 0; ni--) {
+    for (let ni = useState.length - 1; ni >= 0; ni--) {
       const nin = useState[ni];
-      const cn = nin.n2
+      var cn = nin.n2
+      var nn1 = nin.n1
       {
-        let nn1 = nin.n1, nn2 = n2[ni];
-        if (nn2 !== cn && !ni) {
-          insertBefore(cn, nn2, ni, n2)
+        var nn2 = n2[ni];
+        var last = nodes[0]
+        if (cn) {
+          if (nn2 !== cn) {
+            if (last) {
+              insertBefore(cn, last)
+            } else
+              insertBefore(cn, nn2)
+          }
+        } else {
+          cn = new VNode(typeof nn1 === 'string' ? createVnodeText(nn1) : nn1)
+          if (last) {
+            insertBefore(cn, last)
+          } else {
+            cn.append(parent)
+          }
+        }
+
+        var nodeType = getNodeRefType(cn)
+        if (nodeType === TEXTREF2 || nodeType === COMMENTREF2) {
+          if (cn.content !== nn1.content) {
+            cn.el.nodeValue = nn1.content
+            cn.content = nn1.content
+          }
+        } else {
+          vNodeCompareDiff(cn.el, nn1.children, cn.children)
         }
       }
       nodes.unshift(cn)
     }
-
+    console.log(diffStore);
     n2.splice(0, n2.length, ...nodes)
   }
 
   function insertBefore(n1, n2) {
     if (n1 && n2) {
       const parentNode = n2.el.parentNode;
-      console.log(n1, n2);
-      // parentNode.insertBefore(n1.el, n2.el)
+      parentNode.insertBefore(n1.el, n2.el)
     }
   }
 
