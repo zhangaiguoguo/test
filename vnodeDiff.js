@@ -419,15 +419,13 @@
       for (index; index < vnode.length; index++) {
         var n1 = vnode[index];
         var n2 = rnode[index]
-        n1.index = index
-        n2.index = index
         // console.log("loop in ",n1,n2);
         const count = diffStore.diff(n1, n2)
         if (n2 && (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2))) {
           diffStore.diff3(n2)
           n2 = null
         }
-        diffStore.push2(n1, n2, count, index)
+        diffStore.push2(n1, n2, count)
         diffStore.diff2(diffStore.useState.at(-1));
       }
       runDiffStore(diffStore, vnode, rnode)
@@ -436,18 +434,37 @@
   }
 
   function runDiffStore(diffStore, n1, n2) {
-    console.log(diffStore);
     const didUseState = diffStore.didUseState
     for (let i = 0; i < didUseState.length; i++) {
       if (didUseState[i] && didUseState[i].el) {
-        didUseState[i].el.remove()
-        n2.splice(didUseState[i].index, 1)
+        removeNode(didUseState[i])
+        n2.splice(n2.findIndex((nn) => nn === didUseState[i]), 1)
       }
-      didUseState.splice(i, 1)
-      i--
     }
+    didUseState.splice(0, didUseState.length)
     const useState = diffStore.useState
-    console.log(useState);
+    const nodes = []
+    for (let ni = useState.length - 1; ni > 0; ni--) {
+      const nin = useState[ni];
+      const cn = nin.n2
+      {
+        let nn1 = nin.n1, nn2 = n2[ni];
+        if (nn2 !== cn && !ni) {
+          insertBefore(cn, nn2, ni, n2)
+        }
+      }
+      nodes.unshift(cn)
+    }
+
+    n2.splice(0, n2.length, ...nodes)
+  }
+
+  function insertBefore(n1, n2) {
+    if (n1 && n2) {
+      const parentNode = n2.el.parentNode;
+      console.log(n1, n2);
+      // parentNode.insertBefore(n1.el, n2.el)
+    }
   }
 
   function removeNode(node) {
