@@ -18,7 +18,7 @@
 <script src="./pinia.js"></script>
 <script type="module">
   import { template, template2, template3 } from "./template.js";
-  import { baseParse, transform } from "./parseTemplate.js";
+  import { baseParse, transform } from "./baseParse.js";
   import "./vnodeDiff.js";
   const { render, transform: transform2 } = vnodeHooks;
   const vnode = transform(baseParse(template()), transform2);

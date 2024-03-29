@@ -386,10 +386,15 @@
       }
       return false
     }
-    diff3(n) {
+    diff3(n, flag = false) {
       let index = null
+      const useList = []
       for (let i = this.useState.length - 1; i >= 0; i--) {
         const cn = this.useState[i];
+        if (flag && cn.n2 === n) {
+          useList.push(cn)
+        }
+        if (getNodeRefType(cn.n1) !== getNodeRefType(n)) continue
         const count = this.diff(cn.n1, n)
         if (count > cn.count || (count === cn.count && cn.tag === n.tag)) {
           index = [i, count]
@@ -397,6 +402,13 @@
       }
       if (index !== null) {
         const cn = this.useState[index[0]];
+        for (let ii = 0; ii < useList.length; ii++) {
+          const ccnn = useList[ii];
+          if (ccnn !== cn) {
+            ccnn.n2 = null
+            ccnn.count = 0
+          } else continue
+        }
         const cn2 = cn.n2
         cn.n2 = n;
         cn.count = index[1]
@@ -432,26 +444,34 @@
         i--
       }
     } else {
-      const startTime = Date.now()
       const diffStore = new DirrStore()
       let index = 0;
       if (rnode.length > vnode.length) {
-        diffStore.push(rnode.slice(vnode.length))
+        diffStore.push(rnode.slice(vnode.length).filter(Boolean))
       }
+      var iIndex = index
       for (index; index < vnode.length; index++) {
         var n1 = vnode[index];
         var n2 = rnode[index]
-        // console.log("loop in ",n1,n2);
-        const count = diffStore.diff(n1, n2)
-        if (n2 && (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2))) {
-          diffStore.diff3(n2)
-          n2 = null
+        var count;
+        if (!n2) {
+        } else {
+          count = diffStore.diff(n1, n2)
+          if (n2 && (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2))) {
+            diffStore.diff3(n2)
+            n2 = null
+          }
+          iIndex++
         }
         diffStore.push2(n1, n2, count)
         diffStore.diff2(diffStore.useState.at(-1));
       }
+      if (iIndex !== index) {
+        for (let w = iIndex - 1; w >= 0; w--) {
+          diffStore.diff3(rnode[w], true)
+        }
+      }
       runDiffStore(diffStore, vnode, rnode, parent)
-      console.log("耗时:", Date.now() - startTime);
     }
   }
 
@@ -496,7 +516,7 @@
             cn.content = nn1.content
           }
         } else {
-          vNodeCompareDiff(cn.el, nn1.children, cn.children)
+          // vNodeCompareDiff(cn.el, nn1.children, cn.children)
         }
       }
       nodes.unshift(cn)
@@ -529,8 +549,10 @@
     render: (dom, _vnode) => {
       let rnode = null
       function render(vnode) {
+        const startTime = Date.now()
         const result = vNodeCompareDiff(dom, vnode || [], rnode)
         console.log(result);
+        console.log("耗时:", Date.now() - startTime);
         return (rnode = result);
       }
       _vnode && render(_vnode)

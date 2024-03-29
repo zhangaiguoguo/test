@@ -1,41 +1,34 @@
 export function template() {
   return `
-      <!-- <button class="a" click="onSwitch()">{{isOpen ? '关' : '开'}}</button> -->
-      <button class="a" click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
-      <p>你好22</p>
-      <div class="root-div" a b c>
-        <!-- 你好 -->
-        </div>
-        <p>你好1</p>
-        <input class="root-input" value="input value"/>
-        <button class="root-btn">点击</button>
-        <div>
-          你好2 -> div
-        </div>
-      <div>111</div>
-      <button class="a" b  click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
+
+      <div class="div" data-id="1" tag="div">
+        第一个div
+      </div>
+      <div class="div2" data-id="2" tag="div">
+        第二个div
+      </div>
+
     `
 }
 
 
 export function template2() {
   return `
-        <div class="root-div" a b a1 c>
-        </div>
-        <!-- 你好 -->
-        <p>你好</p>
-        <div>
-          <p>你好</p>
-        </div>
-        <input class="root-input" value="input value"/>
-        <div>
-          你好 -> div
-        </div>
-      <p>你好</p>
-     <!-- <button class="a" click="onSwitch()">{{isOpen ? '关222' : '开'}}</button> -->
-     <button class="a" b click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
-     <button class="a" click="onSwitch()">{{isOpen ? '关' : '开'}}</button>
-     你好
+    第一个文本
+    <br/>
+    第一个文本
+    <br/>
+    第一个文本
+    <br/>
+    第一个文本
+    <span>111</span>
+    <div class="div" data-id="1" tag="div">
+      第一个div
+    </div>
+    <div class="div2" data-id="2" tag="div">
+      第二个div
+    </div>
+
   `
 }
 
