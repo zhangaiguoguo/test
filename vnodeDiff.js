@@ -49,7 +49,8 @@
     Object.defineProperty(obj, key, {
       configurable: true,
       enumerable: false,
-      value
+      value,
+      writable: true
     });
   };
 
@@ -80,7 +81,7 @@
       type: null,
       el: null,
       content: null,
-      [ELEMENTTYPE[0]]: null,
+      [ELEMENTREF3]: null,
       key: null,
       tag: null,
       attrs: null,
@@ -115,7 +116,7 @@
       bloak.tag = nodeBloak[0]
       bloak.attrs = nodeBloak[1]
       bloak.type = ELEMENT_NODE
-      bloak[ELEMENTTYPE[0]] = nodeTypeSymbolFind(bloak.type)
+      bloak[ELEMENTREF3] = nodeTypeSymbolFind(bloak.type)
       bloak.children = nodeBloak[2]
       return bloak
     })
@@ -125,7 +126,7 @@
     return createvNodeBloak((bloak) => {
       bloak.tag = "#text"
       bloak.type = TEXT_NODE
-      bloak[ELEMENTTYPE[0]] = nodeTypeSymbolFind(bloak.type)
+      bloak[ELEMENTREF3] = nodeTypeSymbolFind(bloak.type)
       bloak.content = text
       return bloak
     })
@@ -135,7 +136,7 @@
     return createvNodeBloak((bloak) => {
       bloak.tag = "#comment"
       bloak.type = COMMENT_NODE
-      bloak[ELEMENTTYPE[0]] = nodeTypeSymbolFind(bloak.type)
+      bloak[ELEMENTREF3] = nodeTypeSymbolFind(bloak.type)
       bloak.content = text
       return bloak
     })
@@ -211,7 +212,7 @@
   function createRNode(node) {
     let rNode = null
     if (node) {
-      const NODETYPE = typeof node === 'string' ? TEXTREF[0] : node[ELEMENTTYPE[0]];
+      const NODETYPE = typeof node === 'string' ? TEXTREF[0] : node[ELEMENTREF3];
       switch (NODETYPE) {
         case ELEMENTREF[0]:
           rNode = document.createElement(node.tag)
@@ -231,12 +232,13 @@
 
   class VNode {
     constructor(vnode) {
+      vnode = typeof vnode === 'string' ? createVnodeText(vnode) : vnode
       this._vnode = vnode
       this.run()
     }
     run() {
       extend(this, createvNodeBloak((vbloak) => {
-        return Object.assign(vbloak, this._vnode, { children: null })
+        return Object.assign(vbloak, this._vnode, { children: null, attrs: extend({}, this._vnode.attrs) })
       }))
       this.el = createRNode(this)
       setNodeAttrs(this.el, this.attrs)
@@ -250,15 +252,17 @@
     return Array.isArray(target) ? target : [target]
   }
 
-  function vNodeCompareDiff(dom, vnode, rnode) {
+  function vNodeCompareDiff(vnode, rnode, diffManager) {
     const vnodes = transFormArray(vnode)
     const rnodes = transFormArray(rnode).filter(Boolean)
-    vNodeCompareDiffRun(vnodes, rnodes, dom);
+    vNodeCompareDiffRun(vnodes, rnodes, diffManager.root, diffManager);
     return rnodes
   }
 
+  const ELEMENTREF3 = 'elementType'
+
   function getNodeRefType(node) {
-    return node[ELEMENTTYPE[0]]
+    return node[ELEMENTREF3]
   }
 
   function setNodeValue(node, value) {
@@ -278,10 +282,12 @@
   function keys(target) {
     return _keys(target)
   }
+
   const INIT_NODE_PERM = () => 0b0000000
   const NODE_ATTR_SET = 0b0000001
   const NODE_ATTR_ADD = 0b0000010
   const NODE_ATTR_DEL = 0b0000100
+  const NODE_ATTR_LENGTH = 0b0001000
 
   const DIFFCHILDRENLENGTH = 0b000001;
   const DIFFCHILDRENTREE = 0b000010;
@@ -306,7 +312,7 @@
       })
     }
     find(n1, n2) {
-      return this.counts.find((ii) => ii.n1 === n1 && ii.n2 === n2)
+      return this.counts.find((ii) => (ii.n1 === n1 && ii.n2 === n2) || (ii.n1 === n2 && ii.n2 === n1))
     }
     diff(n1, n2, perm = DirrStore.perms[2]) {
       const cCount = this.find(n1, n2)
@@ -316,15 +322,20 @@
       let count = 0
       let CURRENT_NODE_PERM = INIT_NODE_PERM()
       if (!n2) return count
-      if (getNodeRefType(n1) === getNodeRefType(n2) && (perm & DIFFTAGTYPE) === DIFFTAGTYPE) {
+      var tf1 = getNodeRefType(n1), tf2 = getNodeRefType(n2), tf = tf1 === tf2;
+      if ((perm & DIFFTAGTYPE) === DIFFTAGTYPE && tf) {
         count += DIFFTAGTYPE
+      } else if (!tf) {
+        return count
       }
-      if (n1.tag === n2.tag && (perm & DIFFNODETAG) === DIFFNODETAG) {
+      if (tf1 !== ELEMENTREF2) {
+        if (n1.content === n2.content) count += DIFFCHILDRENTREE
+      }
+      if ((perm & DIFFNODETAG) === DIFFNODETAG && n1.tag === n2.tag) {
         count += DIFFNODETAG
       }
-      if (n2.attrs && n1.attrs && (perm & DIFFNODEATTRS) === DIFFNODEATTRS) {
+      if ((perm & DIFFNODEATTRS) === DIFFNODEATTRS && n2.attrs && n1.attrs) {
         const ks = []
-        let flag = false
         for (let k in n1.attrs) {
           if ((k) in n2.attrs) {
             count++
@@ -340,15 +351,13 @@
         if (((perm & DIFFNODEATTRLENGTH) === DIFFNODEATTRLENGTH) && ks.length === ks2.length) {
           count++
         } else {
-          if (ks.length > ks2.length) {
-            CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_ADD
-          } else {
-            CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_DEL
+          if (ks.length !== ks2.length) {
+            CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_LENGTH
           }
         }
       }
       if (n1.children && n2.children) {
-        if (n1.children.length === n2.children.length && (perm & DIFFCHILDRENLENGTH) === DIFFCHILDRENLENGTH) {
+        if ((perm & DIFFCHILDRENLENGTH) === DIFFCHILDRENLENGTH && n1.children.length === n2.children.length) {
           count++
         }
         if ((perm & DIFFCHILDRENTREE) === DIFFCHILDRENTREE) {
@@ -362,9 +371,11 @@
       })
       return count
     }
+    didUseState2 = []
     diff2(un) {
       for (let i = 0; i < this.didUseState.length; i++) {
         const dn = this.didUseState[i]
+        if (this.didUseState2.some((ii) => ii.n1 === dn && ii.n2 === un && ii.count === un.count)) continue
         const cCount = this._diff(un.n1, dn, un.count)
         if (cCount !== false) {
           const n2 = un.n2
@@ -376,6 +387,10 @@
           }
           un.count = cCount
           un.n2 = dn
+        } else {
+          this.didUseState2.push({
+            n1: un, n2: dn, count: dn.count
+          })
         }
       }
     }
@@ -386,47 +401,183 @@
       }
       return false
     }
-    diff3(n, flag = false) {
+    diff4(n, usen) {
+      const usens = transFormArray(usen)
       let index = null
-      const useList = []
       for (let i = this.useState.length - 1; i >= 0; i--) {
         const cn = this.useState[i];
-        if (flag && cn.n2 === n) {
-          useList.push(cn)
-        }
-        if (getNodeRefType(cn.n1) !== getNodeRefType(n)) continue
-        const count = this.diff(cn.n1, n)
-        if (count > cn.count || (count === cn.count && cn.tag === n.tag)) {
+        if (cn === n || !cn.n2 || getNodeRefType(cn.n2) !== getNodeRefType(n.n1)) continue
+        const count = this.diff(cn.n2, n.n1)
+        if (index ? index[1] < count : true && (count > cn.count || (count === cn.count && cn.n2.tag === n.n1.tag))) {
+          if (usens.some((nn) => nn === cn)) continue
           index = [i, count]
         }
       }
       if (index !== null) {
         const cn = this.useState[index[0]];
-        for (let ii = 0; ii < useList.length; ii++) {
-          const ccnn = useList[ii];
-          if (ccnn !== cn) {
-            ccnn.n2 = null
-            ccnn.count = 0
-          } else continue
+        const cn2 = cn.n2
+        cn.n2 = null;
+        cn.count = 0
+        n.count = index[1]
+        n.n2 = cn2
+        if (cn2) {
+          this.diff4(cn, n)
         }
+        return true
+      } else {
+        n.count = 0
+        this.diff2(n)
+      }
+    }
+    diff3(n, usens) {
+      usens = transFormArray(usens)
+      let index = null
+      for (let i = this.useState.length - 1; i >= 0; i--) {
+        const cn = this.useState[i];
+        if (getNodeRefType(cn.n1) !== getNodeRefType(n)) continue
+        const count = this.diff(cn.n1, n)
+        if (index ? index[1] < count : true && (count > cn.count || (count === cn.count && cn.n1.tag === n.tag))) {
+          if (usens.some((nn) => nn === cn)) continue
+          index = [i, count]
+        }
+      }
+      if (index !== null) {
+        const cn = this.useState[index[0]];
         const cn2 = cn.n2
         cn.n2 = n;
         cn.count = index[1]
         if (cn2) {
-          this.diff3(cn2)
+          this.diff3(cn2, cn)
         }
         return true
       } else {
         this.didUseState.push(n)
       }
     }
+    clear() {
+      this.useState = []
+      this.didUseState = []
+      this.didUseState2 = []
+      this.counts = []
+    }
   }
 
-  function vNodeCompareDiffRun(vnode, rnode, parent) {
+  const diffFiberAsyncRun = (typeof requestAnimationFrame === 'function' ? () => ({
+    then(fn) {
+      return requestAnimationFrame(fn)
+    }
+  }) : () => Promise.resolve())
+
+  class DiffFiber {
+    root = void 0
+    constructor(root) {
+      this.root = root
+    }
+    count = 0
+
+    nodes = []
+
+    tasks = []
+
+    cTasks = null
+
+    status = true
+
+    push(task) {
+      this.tasks.push(task)
+    }
+
+    clear() {
+      this.count++
+      this.tasks = []
+    }
+
+    remove(task) {
+      var sub = this.tasks.indexOf(task)
+      if (sub !== -1) {
+        this.tasks.splice(sub, 1)
+        return true
+      }
+      return false
+    }
+
+    pop() {
+      return this.tasks.pop()
+    }
+
+    stop() {
+      this.status = false
+    }
+
+    start() {
+      this.status = true
+    }
+
+    _runTask() {
+      if (!this.tasks.length) return
+      var startTime = Date.now()
+      const task = this.tasks.at(-1)
+      if (task) {
+        this.pop()
+        if (task.type) {
+          this.removeSomeRunDiff(task.type, this.tasks.length - 1)
+        }
+        task.run()
+      }
+      this.runTask(Date.now() - startTime >= 16)
+    }
+
+    runTask(isAsync) {
+      isAsync = isAsync === void 0 ? false : isAsync
+      isAsync = true
+      if (!this.tasks.length) return
+      const oldCount = this.count
+      if (isAsync) {
+        diffFiberAsyncRun().then(() => {
+          if (oldCount !== this.count || !this.status) {
+            return
+          }
+          this._runTask()
+        })
+      } else {
+        this._runTask()
+      }
+    }
+
+    removeSomeRunDiff(type, index) {
+      index--
+      while (index >= 0 && this.tasks.length) {
+        if (this.tasks[index].type === type) {
+          this.tasks.splice(index, 1)
+        }
+        index--
+      }
+    }
+
+    runDiff2(vnode, isAsync) {
+      this.count++
+      this.push({
+        type: "ROOT",
+        run: () => {
+          this.nodes = vNodeCompareDiff(vnode, this.nodes, this)
+        }
+      })
+      this.runTask(isAsync)
+    }
+
+    runDiff(vnode, isAsync) {
+      this.start()
+      this.clear()
+      this.runDiff2(vnode, isAsync)
+    }
+
+  }
+
+  function vNodeCompareDiffRun(vnode, rnode, parent, diffManager) {
     if (!rnode.length && vnode.length) {
       for (let i = 0; i < vnode.length; i++) {
         if (vnode[i] === null) continue
-        const node = new VNode(typeof vnode[i] === 'string' ? createVnodeText(vnode[i]) : vnode[i])
+        const node = new VNode(vnode[i])
         if (parent) {
           node.append(parent)
         }
@@ -434,7 +585,7 @@
         if (vnode[i].children && vnode[i].children.length) {
           node.children = []
           const children = transFormArray(vnode[i].children)
-          vNodeCompareDiffRun(children, node.children, node.el)
+          vNodeCompareDiffRun(children, node.children, node.el, diffManager)
         }
       }
     } else if (!vnode.length && rnode.length) {
@@ -449,7 +600,6 @@
       if (rnode.length > vnode.length) {
         diffStore.push(rnode.slice(vnode.length).filter(Boolean))
       }
-      var iIndex = index
       for (index; index < vnode.length; index++) {
         var n1 = vnode[index];
         var n2 = rnode[index]
@@ -461,22 +611,22 @@
             diffStore.diff3(n2)
             n2 = null
           }
-          iIndex++
         }
         diffStore.push2(n1, n2, count)
-        diffStore.diff2(diffStore.useState.at(-1));
-      }
-      if (iIndex !== index) {
-        for (let w = iIndex - 1; w >= 0; w--) {
-          diffStore.diff3(rnode[w], true)
+        var ncn = diffStore.useState.at(-1)
+        diffStore.diff2(ncn);
+        if (!ncn.n2 && !n2) {
+          diffStore.diff4(ncn)
         }
       }
-      runDiffStore(diffStore, vnode, rnode, parent)
+      runDiffStore(diffStore, vnode, rnode, parent, diffManager)
     }
+    return rnode
   }
 
-  function runDiffStore(diffStore, n1, n2, parent) {
+  function runDiffStore(diffStore, n1, n2, parent, diffManager) {
     const didUseState = diffStore.didUseState
+    const oTasks = diffStore.tasks
     for (let i = 0; i < didUseState.length; i++) {
       if (didUseState[i] && didUseState[i].el) {
         removeNode(didUseState[i])
@@ -488,27 +638,47 @@
     const nodes = []
     for (let ni = useState.length - 1; ni >= 0; ni--) {
       const nin = useState[ni];
-      var cn = nin.n2
-      var nn1 = nin.n1
+      let cn = nin.n2
+      let nn1 = nin.n1
+      var CURRENT_NODE_PERM = null
+      if (getNodeRefType(nn1) === ELEMENTREF2) {
+        const sub = diffStore.find(cn, nn1)
+        if (sub) {
+          CURRENT_NODE_PERM = sub.CURRENT_NODE_PERM
+        }
+      }
       {
         var nn2 = n2[ni];
         var last = nodes[0]
         if (cn) {
+          var ocn = null
+          if (nn1.tag !== cn.tag) {
+            var cnc = cn.children
+            ocn = cn
+            cn = new VNode(nn1)
+            cn.children = cnc
+          }
           if (nn2 !== cn) {
             if (last) {
               insertBefore(cn, last)
             } else
               insertBefore(cn, nn2)
+          } else {
+            if (!cn.el.parentNode || !cn.el.parentNode.parentNode) {
+              cn.append(parent)
+            }
+          }
+          if (ocn) {
+            removeNode(ocn)
           }
         } else {
-          cn = new VNode(typeof nn1 === 'string' ? createVnodeText(nn1) : nn1)
+          cn = new VNode(nn1)
           if (last) {
             insertBefore(cn, last)
           } else {
             cn.append(parent)
           }
         }
-
         var nodeType = getNodeRefType(cn)
         if (nodeType === TEXTREF2 || nodeType === COMMENTREF2) {
           if (cn.content !== nn1.content) {
@@ -516,13 +686,54 @@
             cn.content = nn1.content
           }
         } else {
-          // vNodeCompareDiff(cn.el, nn1.children, cn.children)
+          let newChildren = cn.children || [];
+          diffManager.push({
+            run: () => {
+              cn.children = vNodeCompareDiffRun(nn1.children, newChildren, cn.el, diffManager)
+            }
+          })
         }
       }
+      if (!ocn) {
+        if (CURRENT_NODE_PERM > 0) {
+          setAttribute2(nn1, cn, CURRENT_NODE_PERM)
+        }
+      }
+      cn.el.__node__ = (cn._vnode = nn1)
       nodes.unshift(cn)
     }
-    console.log(diffStore);
     n2.splice(0, n2.length, ...nodes)
+    nodes.splice(0, nodes.length)
+    diffStore.clear()
+  }
+
+  function setAttribute2(n1, n2, CURRENT_NODE_PERM) {
+    let attrs = n1.attrs, attrs2 = n2.attrs;
+    var el = n1.el || n2.el
+    var NODE_ATTR_LENGTH2 = attrs2 && (CURRENT_NODE_PERM & NODE_ATTR_LENGTH) === NODE_ATTR_LENGTH
+    var attrs2Ks = keys(attrs2)
+    if (attrs) {
+      if ((CURRENT_NODE_PERM & NODE_ATTR_SET) === NODE_ATTR_SET || NODE_ATTR_LENGTH2) {
+        for (var k in attrs) {
+          if (!attrs2 || attrs2[k] !== attrs[k]) {
+            attrs2[k] = attrs[k]
+            el.setAttribute(k, attrs2[k])
+          }
+          if (attrs2Ks) {
+            var ki = attrs2Ks.indexOf(k)
+            if (ki !== -1) {
+              attrs2Ks.splice(ki, 1)
+            }
+          }
+        }
+      }
+    }
+    if (attrs2Ks && attrs2Ks.length) {
+      for (let k = 0; k < attrs2Ks.length; k++) {
+        el.removeAttribute(attrs2Ks[k])
+        delete attrs2[attrs2Ks[k]]
+      }
+    }
   }
 
   function insertBefore(n1, n2) {
@@ -530,6 +741,10 @@
       const parentNode = n2.el.parentNode;
       parentNode.insertBefore(n1.el, n2.el)
     }
+  }
+
+  function replaceNode(n1, n2) {
+    n1.el.parentNode.replaceChild(n2.el, n1.el)
   }
 
   function removeNode(node) {
@@ -547,13 +762,13 @@
     h: createVnode,
     parseNodeTree,
     render: (dom, _vnode) => {
-      let rnode = null
-      function render(vnode) {
-        const startTime = Date.now()
-        const result = vNodeCompareDiff(dom, vnode || [], rnode)
-        console.log(result);
-        console.log("耗时:", Date.now() - startTime);
-        return (rnode = result);
+      let diffFiber = null
+      function render(vnode, isAsync) {
+        if (!diffFiber) {
+          diffFiber = new DiffFiber(dom)
+        }
+        diffFiber.runDiff(vnode, isAsync)
+        return diffFiber
       }
       _vnode && render(_vnode)
       return render

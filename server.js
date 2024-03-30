@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync } from "fs";
-import { baseParse } from "./parseTemplate.js";
+import { readFileSync, writeFileSync } from "node:fs";
+import { baseParse } from "./baseParse.js";
 import { getCurrentTime } from "./utils.js"
 
 const template = readFileSync("./template.vue", 'utf-8')
