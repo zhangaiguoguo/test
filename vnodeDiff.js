@@ -299,13 +299,13 @@
     }
     diff(n1, n2, perm = DirrStore.perms[2]) {
       let count = 0
+      if (!n2) return count
       if ((n1[KEY] !== null && n2[KEY] === null) || (n1[KEY] === null && n2[KEY] !== null)) return count
       const cCount = this.find(n1, n2)
       if (cCount) {
         return cCount.count
       }
       let CURRENT_NODE_PERM = INIT_NODE_PERM()
-      if (!n2) return count
       var tf1 = getNodeRefType(n1), tf2 = getNodeRefType(n2), tf = tf1 === tf2;
       if ((perm & DIFFTAGTYPE) === DIFFTAGTYPE && tf) {
         count += DIFFTAGTYPE
@@ -568,7 +568,7 @@
       })
       const startTime = Date.now()
       this.runTask(isAsync)
-      console.log("耗时:",Date.now() - startTime);
+      console.log("耗时:", Date.now() - startTime);
     }
 
     runDiff(vnode, isAsync) {
@@ -619,6 +619,7 @@
   const VNODE_OPERATE_PERM = 0b00001
 
   function vNodeCompareDiffRun(vnode, rnode, parent, diffManager) {
+    if (!vnode) return rnode
     if (!rnode.length && vnode.length) {
       for (let i = 0; i < vnode.length; i++) {
         if (vnode[i] === null) continue

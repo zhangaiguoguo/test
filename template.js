@@ -11,6 +11,7 @@ export function template() {
           color:red;
         }
       </style>
+      <iframe src="https://element-plus.gitee.io/zh-CN/component/table.html"></iframe>
     `
 }
 
@@ -28,9 +29,10 @@ export function template2() {
       </div>
       <style>
         .div{
-          color:red;
+          color:green;
         }
       </style>
+      <iframe src="https://element-plus.gitee.io/zh-CN/component/table.html" b></iframe>
   `
 }
 
