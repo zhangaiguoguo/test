@@ -318,18 +318,27 @@ function parseAttrs$(context, node) {
     const { offset } = getCursor(context)
     while (!isTagStartEndLabel(context)) {
         const s = context.source
-        const index = s.indexOf("="), index2 = /(\/?>)/ms.exec(s), index3 = s.indexOf(" ");
+        let index = s.indexOf("="), index2 = /(\/?>)/ms.exec(s), index3 = s.indexOf(" ");
         let match = null
         let endIndex = index
-        if (index3 === 0 || (index3 > -1 && index3 < index && index2.index > index3) || (index2 && index3 > -1 && index === -1 && index3 < index2.index)) {
+        const flag = index3 === 0 || (index3 > -1 && index3 < index && index2.index > index3) || (index2 && index3 > -1 && index === -1 && index3 < index2.index);
+        const flag2 = !flag && (index2 && index > index2.index)
+        const flag3 = flag && (index3 > -1 && index3 < index2.index);
+        if (flag || (flag2 && flag3)) {
+            const index3exex = /[^\t\r\n\f\s]+/.exec(s)
+            if (index3exex && index3exex.index < index3) {
+                index3 = index3exex.index + index3exex[0].length
+            }
+        }
+        if (flag) {
             match = s.slice(0, index3)
             endIndex = index3
             if (!match.trim()) {
                 advanceBy(context, 1)
                 continue
             }
-        } else if (index2 && index > index2.index) {
-            if (index3 > -1 && index3 < index2.index) {
+        } else if (flag2) {
+            if (flag3) {
                 endIndex = index3
             } else {
                 endIndex = index2.index

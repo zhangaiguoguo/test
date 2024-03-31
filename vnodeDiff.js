@@ -362,7 +362,14 @@
     diff2(un) {
       for (let i = 0; i < this.didUseState.length; i++) {
         const dn = this.didUseState[i]
+        if(dn === un.n2){
+          this.didUseState.splice(i, 1);
+          i--
+          continue
+        }
         if (
+          dn === un.n2
+          ||
           ((un.n1[KEY] !== null || dn[KEY] !== null) && un.n1[KEY] !== dn[KEY])
           ||
           this.didUseState2.some((ii) => ii.n1 === dn && ii.n2 === un && ii.count === un.count)
@@ -631,11 +638,7 @@
         if (!isSpecialLabel(node.tag) && vnode[i].children && vnode[i].children.length) {
           node.children = []
           const children = transFormArray(vnode[i].children)
-          diffManager.push({
-            run: () => {
-              vNodeCompareDiffRun(children, node.children, node.el, diffManager)
-            }
-          })
+          vNodeCompareDiffRun(children, node.children, node.el, diffManager)
         }
       }
     } else if (!vnode.length && rnode.length) {
@@ -651,9 +654,16 @@
         diffStore.push(rnode.slice(vnode.length).filter(Boolean))
       }
       for (index; index < vnode.length; index++) {
-        var n1 = vnode[index];
-        var n2 = rnode[index]
+        let n1 = vnode[index];
+        let n2 = rnode[index];
         var count;
+        if (n1[KEY] !== null) {
+          const on2 = n2
+          n2 = rnode.find((n2) => n2[KEY] !== null && n2[KEY] === n1[KEY]) || null;
+          if (on2 && n2 !== on2) {
+            diffStore.diff3(on2)
+          }
+        }
         if (!n2) {
         } else {
           count = diffStore.diff(n1, n2)
@@ -715,8 +725,9 @@
           if (nn2 !== cn) {
             if (last) {
               insertBefore(cn, last)
-            } else
+            } else if (nn2) {
               insertBefore(cn, nn2)
+            }
           } else {
             if (!cn.el.parentNode || !cn.el.parentNode.parentNode) {
               cn.append(parent)
@@ -749,6 +760,7 @@
               cn.children = vNodeCompareDiffRun(nn1.children, newChildren, cn.el, diffManager)
             }
           })
+          diffManager.runTask()
         }
       }
       if (!ocn) {
@@ -761,7 +773,7 @@
     }
     n2.splice(0, n2.length, ...nodes)
     nodes.splice(0, nodes.length)
-    diffStore.clear()
+    // diffStore.clear()
   }
 
   function setAttribute2(n1, n2, CURRENT_NODE_PERM) {
@@ -840,16 +852,25 @@
       if (flag) {
         const attrs = node.props && node.props.attrs;
         var node2 = node.type === ELEMENT_NODE ? createVnode(node.tag, null, isSpecialLabel(node.tag) ? node.nodeValue : null) : node.type === TEXT_NODE ? createVnodeText(node.nodeValue) : createVnodeComment(node.nodeValue);
+        const events = {}
         if (attrs) {
           attrs$ = {}
           for (let w in attrs) {
             const attr = attrs[w]
+            if (attr.nodeName.startsWith("#")) {
+              continue
+            }
+            if (attr.nodeName.startsWith("@")) {
+              events[attr.nodeName.substr(1)] = attr.nodeValue
+              continue
+            }
             if (KEY === attr.nodeName) {
               node2[KEY] = attr.nodeValue
             } else
               attrs$[attr.nodeName] = attr.nodeValue
           }
           node2.attrs = attrs$
+          node2.evts = events
         }
         if (isSpecialLabel(node2.tag)) {
           node2.content = node2.children

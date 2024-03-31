@@ -1,38 +1,39 @@
 export function template() {
   return `
-      <div class="div" data-id="1" tag="div" b>
-        第一个div
-      </div>
-      <div class="div" data-id="3" tag="div" b key="2">
-        第三个div
-      </div>
       <style>
         .div{
           color:red;
         }
       </style>
-      <iframe src="https://element-plus.gitee.io/zh-CN/component/table.html"></iframe>
+      <div class="div">
+        <p>
+          你好
+        </p>
+      </div>
+      <div class=div key=1>
+        <h1>你好2</h1>
+      </div>
     `
 }
 
 
 export function template2() {
   return `
-      <div class="div" data-id="1" tag="div" b>
-        第一个div
-      </div>
-      <div class="div" data-id="2" tag="div" b key="2">
-        第二个div
-      </div>
-      <div class="div" data-id="3" tag="div" b key="1">
-        第三个div
-      </div>
       <style>
         .div{
           color:green;
         }
       </style>
-      <iframe src="https://element-plus.gitee.io/zh-CN/component/table.html" b></iframe>
+      <div class="div" key=1>
+        <p>
+          你好2
+        </p>
+      </div>
+      <div class="div">
+        <h1>
+          你好
+        </h1>
+      </div>
   `
 }
 
