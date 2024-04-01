@@ -73,11 +73,7 @@ function parseChildren(context, ancestors) {
             } else node = null
         }
         if (node) {
-            if (parent) {
-                parent.children.push(node)
-            } else {
-                nodes.push(...transFormArray(node).filter(Boolean))
-            }
+            nodes.push(...transFormArray(node).filter(Boolean))
         }
     }
     if (flag === false && context.source) {
@@ -105,12 +101,6 @@ function parseChildren(context, ancestors) {
                     end: endEnd
                 }
                 ancestors.pop()
-            }
-        }
-        if (context.source) {
-            const pNodes = parseChildren(context, ancestors)
-            if (ancestors.length === 0) {
-                nodes.push(...pNodes)
             }
         }
     } else {
@@ -243,9 +233,9 @@ function parseElement(context, ancestors) {
     } else {
         specialLabelProcessing(context, ancestors)
     }
-    if (parent) {
-        parent.children.push(node);
-        return
+    if (context.source) {
+        const children = parseChildren(context, ancestors)
+        node.children = children
     }
     return node
 }
@@ -315,7 +305,7 @@ function isTagStartEndLabel(context) {
 
 function parseAttrs$(context, node) {
     let attrs = []
-    const { offset } = getCursor(context)
+    const offset  = context.offset
     while (!isTagStartEndLabel(context)) {
         const s = context.source
         let index = s.indexOf("="), index2 = /(\/?>)/ms.exec(s), index3 = s.indexOf(" ");
@@ -324,7 +314,7 @@ function parseAttrs$(context, node) {
         const flag = index3 === 0 || (index3 > -1 && index3 < index && index2.index > index3) || (index2 && index3 > -1 && index === -1 && index3 < index2.index);
         const flag2 = !flag && (index2 && index > index2.index)
         const flag3 = flag && (index3 > -1 && index3 < index2.index);
-        if (flag || (flag2 && flag3)) {
+        if (s[index3] === " " && (flag || (flag2 && flag3))) {
             const index3exex = /[^\t\r\n\f\s]+/.exec(s)
             if (index3exex && index3exex.index < index3) {
                 index3 = index3exex.index + index3exex[0].length
@@ -333,8 +323,12 @@ function parseAttrs$(context, node) {
         if (flag) {
             match = s.slice(0, index3)
             endIndex = index3
-            if (!match.trim()) {
-                advanceBy(context, 1)
+            if (!/[^\t\r\n\f\s]+/.test(match)) {
+                const sexec = /[^\t\r\n\f\s]/.exec(s)
+                if (sexec) {
+                    endIndex = sexec.index || endIndex
+                }
+                advanceBy(context, endIndex)
                 continue
             }
         } else if (flag2) {
@@ -347,15 +341,7 @@ function parseAttrs$(context, node) {
         } else {
             const symbol = s[index + 1]
             if (isSpecialSymbols(symbol)) {
-                let n = 0
-                let i = 0
-                while (n < 2 && i < s.length) {
-                    if (s[i] === symbol) {
-                        n++
-                    }
-                    i++
-                }
-                endIndex = i
+                endIndex = s.indexOf(symbol, index + 2) + 1
             } else {
                 endIndex = /([\s\/\>]{1})/ms.exec(s)?.index || s.length;
             }
@@ -367,11 +353,11 @@ function parseAttrs$(context, node) {
         }
         // break
     }
-    return [context.originalSource.slice(offset, getCursor(context).offset), attrs]
+    return [context.originalSource.slice(offset, context.offset), attrs]
 }
 
 function isSpecialSymbols(v) {
-    return v.charCodeAt() === 96 || v.charCodeAt() === 39 || v.charCodeAt() === 34
+    return v === "'" || v === '"' || v === "`"
 }
 
 function useParseAttr(context, value, attrs, node) {
@@ -382,7 +368,7 @@ function useParseAttr(context, value, attrs, node) {
     const nodeName = value.slice(0, splitIndex)
     let nodeValue = value.slice(splitIndex + 1)
     if (nodeValue) {
-        if (isSpecialSymbols(nodeValue)) {
+        if (isSpecialSymbols(nodeValue[0])) {
             nodeValue = nodeValue.slice(1, -1)
         }
     }

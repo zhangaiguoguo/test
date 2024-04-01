@@ -13,6 +13,7 @@ export function template() {
       <div class=div key=1>
         <h1>你好2</h1>
       </div>
+      <span>2</span>
     `
 }
 
@@ -24,15 +25,21 @@ export function template2() {
           color:green;
         }
       </style>
-      <div class="div" key=1>
+      <span>1</span>
+      <div class="div">
         <p>
-          你好2
+          你好
         </p>
       </div>
-      <div class="div">
-        <h1>
-          你好
-        </h1>
+      <span>3</span>
+      <div class=div key=1>
+        <h1>你好2</h1>
+      </div>
+      <span>2</span>
+      <span>4</span>
+      <span>6</span>
+      <div class=div key=1>
+        <h1>你好2</h1>
       </div>
   `
 }

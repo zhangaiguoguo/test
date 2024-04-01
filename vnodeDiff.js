@@ -278,14 +278,48 @@
   const DIFFNODETAG = 0b0100000;
   const DIFFTAGTYPE = 0b1000000;
   const DIFFNODEKEY = 0b10000000
+  const KEY_PERM_KEY = "KEY_PERM";
+  const KEY_PERM_N1_PERM = 0b000001;
+  const KEY_PERM_N2_PERM = 0b000010;
+  const KEY_PERM_N_PERM = 0b0000100;
+
+  function diffKey$(n1, n2) {
+    const diffKeyState = this.diffKeyState
+    var sub = diffKeyState.find((item) => (item.n1 === n1 && item.n2 === n2) || (item.n1 === n2 && item.n2 === n1));
+    if (sub) {
+      return sub[KEY_PERM_KEY];
+    }
+    var KEY_PERM = 0b000000;
+
+    if (!n1 || !n2) return KEY_PERM
+
+    if (n1[KEY] !== null && n1[KEY] !== void 0) {
+      KEY_PERM = KEY_PERM | KEY_PERM_N1_PERM;
+    }
+    if (n2[KEY] !== null && n2[KEY] !== void 0) {
+      KEY_PERM = KEY_PERM | KEY_PERM_N2_PERM;
+    }
+
+    if (isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) && isCurrentScopeExist(KEY_PERM, KEY_PERM_N2_PERM) && n1[KEY] === n2[KEY]) {
+      KEY_PERM = KEY_PERM | KEY_PERM_N_PERM;
+    }
+    this.diffKeyState.push({ n1, n2, [KEY_PERM_KEY]: KEY_PERM });
+    return KEY_PERM;
+  }
+
+  function isCurrentScopeExist(cexits, current) {
+    return (cexits & current) === current
+  }
+
   class DirrStore {
     didUseState = []
     useState = []
+    diffKeyState = []
     static perms = [0b111111, 0b111101, 0b111111]
-    constructor() {
-
-    }
     counts = []
+    didUseState2 = []
+    diff3Status = []
+    diff4Status = []
     push2(n1, n2, count, index) {
       this.useState.push({ n1, n2, count, index });
     }
@@ -312,7 +346,7 @@
       } else if (!tf) {
         return count
       }
-      if (n1[KEY] === n2[KEY]) {
+      if (n1[KEY] !== null && n1[KEY] === n2[KEY]) {
         count += DIFFNODEKEY
       }
       if (tf1 !== ELEMENTREF2) {
@@ -358,21 +392,25 @@
       })
       return count
     }
-    didUseState2 = []
+    diffKey = diffKey$
     diff2(un) {
+      const KEY_PERM = this.diffKey(un.n1, un.n2)
+      const KEY_PERM_FLAG = isCurrentScopeExist(KEY_PERM, KEY_PERM_N_PERM)
       for (let i = 0; i < this.didUseState.length; i++) {
         const dn = this.didUseState[i]
-        if(dn === un.n2){
+        if (dn === un.n2) {
           this.didUseState.splice(i, 1);
           i--
           continue
         }
         if (
-          dn === un.n2
-          ||
-          ((un.n1[KEY] !== null || dn[KEY] !== null) && un.n1[KEY] !== dn[KEY])
+          KEY_PERM_FLAG
           ||
           this.didUseState2.some((ii) => ii.n1 === dn && ii.n2 === un && ii.count === un.count)
+          ||
+          dn === un.n2
+          ||
+          ((isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) || dn[KEY] !== null) && un.n1[KEY] !== dn[KEY])
         ) continue
         const cCount = this._diff(un.n1, dn, un.count)
         if (cCount !== false) {
@@ -399,19 +437,27 @@
       }
       return false
     }
+    diff4StatusSome(n1, n2) {
+      return this.diff4Status.some((ii) => (ii.n1 === n1 && ii.n2 === n2) || (ii.n1 === n2 && ii.n2 === n1))
+    }
+    diff3StatusSome(n1, n2) {
+      return this.diff3Status.some((ii) => (ii.n1 === n1 && ii.n2 === n2) || (ii.n1 === n2 && ii.n2 === n1))
+    }
     diff4(n, usen) {
+      const KEY_PERM = this.diffKey(n.n1, n.n2)
+      if (isCurrentScopeExist(KEY_PERM, KEY_PERM_N_PERM)) return
       const usens = transFormArray(usen)
       let index = null
       for (let i = this.useState.length - 1; i >= 0; i--) {
         const cn = this.useState[i];
+        if (!cn.n2 || cn === n || this.diff4StatusSome(cn, n) || getNodeRefType(cn.n2) !== getNodeRefType(n.n1)) continue
+        const CN_KEY_PERM = this.diffKey(cn.n1, cn.n2)
         if (
-          !cn.n2
+          isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N_PERM)
           ||
-          ((n.n1[KEY] !== null || cn.n2[KEY] !== null) && n.n1[KEY] !== cn.n2[KEY])
+          (isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) && !isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N2_PERM))
           ||
-          cn === n
-          ||
-          getNodeRefType(cn.n2) !== getNodeRefType(n.n1)
+          (isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N2_PERM) && !isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM))
         ) continue
         const count = this.diff(cn.n2, n.n1)
         if (index ? index[1] < count : true && (count > cn.count || (count === cn.count && cn.n2.tag === n.n1.tag))) {
@@ -426,6 +472,10 @@
         cn.count = 0
         n.count = index[1]
         n.n2 = cn2
+        this.diff4Status.push({
+          n1: cn,
+          n2: n
+        })
         if (cn2) {
           this.diff4(cn, n)
         }
@@ -437,13 +487,24 @@
     }
     diff3(n, usens) {
       usens = transFormArray(usens)
+      let flag = false
       let index = null
       for (let i = this.useState.length - 1; i >= 0; i--) {
         const cn = this.useState[i];
+        if (cn.n2 && cn.n2 === n) {
+          flag = true
+          continue
+        }
+        if (this.diff3StatusSome(cn, n)) continue
+        const KEY_PERM = this.diffKey(cn.n1, cn.n2)
         if (
           getNodeRefType(cn.n1) !== getNodeRefType(n)
           ||
-          ((n[KEY] !== null || cn.n1[KEY] !== null) && cn.n1[KEY] !== n[KEY])
+          isCurrentScopeExist(KEY_PERM, KEY_PERM_N_PERM)
+          ||
+          (n[KEY] !== null && !isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM))
+          ||
+          (isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) && n[KEY] === null)
         ) continue
         const count = this.diff(cn.n1, n)
         if (index ? index[1] < count : true && (count > cn.count || (count === cn.count && cn.n1.tag === n.tag))) {
@@ -456,11 +517,15 @@
         const cn2 = cn.n2
         cn.n2 = n;
         cn.count = index[1]
+        this.diff3Status.push({
+          n1: cn,
+          n2: n
+        })
         if (cn2) {
           this.diff3(cn2, cn)
         }
         return true
-      } else {
+      } else if (!flag) {
         this.didUseState.push(n)
       }
     }
@@ -469,6 +534,8 @@
       this.didUseState = []
       this.didUseState2 = []
       this.counts = []
+      this.diffKeyState = []
+      this.diff4Status = []
     }
   }
 
@@ -653,13 +720,29 @@
       if (rnode.length > vnode.length) {
         diffStore.push(rnode.slice(vnode.length).filter(Boolean))
       }
+      let keyStartIndex = 0
+      const useNodeKeys = []
       for (index; index < vnode.length; index++) {
         let n1 = vnode[index];
         let n2 = rnode[index];
+        if (n2 && ((n1[KEY] === null && n2[KEY] !== null) || useNodeKeys.some((kn2) => kn2 === n2))) {
+          diffStore.diff3(n2)
+          n2 = null
+        }
         var count;
-        if (n1[KEY] !== null) {
+        if (n1[KEY] !== null && (!n2 || n2[KEY] !== n1[KEY])) {
           const on2 = n2
-          n2 = rnode.find((n2) => n2[KEY] !== null && n2[KEY] === n1[KEY]) || null;
+          n2 = null
+          while (keyStartIndex < rnode.length) {
+            const keyN2 = rnode[keyStartIndex]
+            if (keyN2[KEY] !== null && keyN2[KEY] === n1[KEY]) {
+              n2 = keyN2
+              keyStartIndex++
+              useNodeKeys.push(n2)
+              break
+            }
+            keyStartIndex++
+          }
           if (on2 && n2 !== on2) {
             diffStore.diff3(on2)
           }
@@ -667,8 +750,7 @@
         if (!n2) {
         } else {
           count = diffStore.diff(n1, n2)
-          const keyFlag = (n1[KEY] !== null || n2[KEY] !== null)
-          if (n2 && (keyFlag ? (n2[KEY] !== n1[KEY]) : (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2)))) {
+          if (n2 && (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2))) {
             diffStore.diff3(n2)
             n2 = null
           }
@@ -693,7 +775,6 @@
         n2.splice(n2.findIndex((nn) => nn === didUseState[i]), 1)
       }
     }
-    didUseState.splice(0, didUseState.length)
     const useState = diffStore.useState
     const nodes = []
     for (let ni = useState.length - 1; ni >= 0; ni--) {
@@ -727,6 +808,9 @@
               insertBefore(cn, last)
             } else if (nn2) {
               insertBefore(cn, nn2)
+            } else if (!nn2) {
+              if (parent.lastElementChild !== cn.el)
+                cn.append(parent)
             }
           } else {
             if (!cn.el.parentNode || !cn.el.parentNode.parentNode) {
@@ -773,7 +857,7 @@
     }
     n2.splice(0, n2.length, ...nodes)
     nodes.splice(0, nodes.length)
-    // diffStore.clear()
+    diffStore.clear()
   }
 
   function setAttribute2(n1, n2, CURRENT_NODE_PERM) {
@@ -806,7 +890,7 @@
   }
 
   function insertBefore(n1, n2) {
-    if (n1 && n2) {
+    if (n1 && n2 && n2.el.previousElementSibling !== n1.el) {
       const parentNode = n2.el.parentNode;
       parentNode.insertBefore(n1.el, n2.el)
     }
