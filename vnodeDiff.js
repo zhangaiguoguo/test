@@ -459,6 +459,9 @@
           ||
           (isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N2_PERM) && !isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM))
         ) continue
+        if (isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) && isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N2_PERM) && n.n1[KEY] !== cn.n2[KEY]) {
+          continue
+        }
         const count = this.diff(cn.n2, n.n1)
         if (index ? index[1] < count : true && (count > cn.count || (count === cn.count && cn.n2.tag === n.n1.tag))) {
           if (usens.some((nn) => nn === cn)) continue
@@ -506,6 +509,9 @@
           ||
           (cn.n1[KEY] !== null && n[KEY] === null)
         ) continue
+        if (n[KEY] !== null && cn.n1[KEY] !== null && cn.n1[KEY] !== n[KEY]) {
+          continue
+        }
         const count = this.diff(cn.n1, n)
         if ((index ? index[1] < count : true) && (count > cn.count || (count === cn.count && cn.n1.tag === n.tag))) {
           if (usens.some((nn) => nn === cn)) continue
