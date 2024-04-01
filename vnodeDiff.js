@@ -502,12 +502,12 @@
           ||
           isCurrentScopeExist(KEY_PERM, KEY_PERM_N_PERM)
           ||
-          (n[KEY] !== null && !isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM))
+          (n[KEY] !== null && cn.n1[KEY] === null)
           ||
-          (isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) && n[KEY] === null)
+          (cn.n1[KEY] !== null && n[KEY] === null)
         ) continue
         const count = this.diff(cn.n1, n)
-        if (index ? index[1] < count : true && (count > cn.count || (count === cn.count && cn.n1.tag === n.tag))) {
+        if ((index ? index[1] < count : true) && (count > cn.count || (count === cn.count && cn.n1.tag === n.tag))) {
           if (usens.some((nn) => nn === cn)) continue
           index = [i, count]
         }
@@ -768,6 +768,7 @@
   }
 
   function runDiffStore(diffStore, n1, n2, parent, diffManager) {
+    console.log(diffStore);
     const didUseState = diffStore.didUseState
     for (let i = 0; i < didUseState.length; i++) {
       if (didUseState[i] && didUseState[i].el) {
@@ -853,11 +854,12 @@
         }
       }
       cn.el.__node__ = (cn._vnode = nn1)
+      cn.key = nn1.key
       nodes.unshift(cn)
     }
     n2.splice(0, n2.length, ...nodes)
     nodes.splice(0, nodes.length)
-    diffStore.clear()
+    // diffStore.clear()
   }
 
   function setAttribute2(n1, n2, CURRENT_NODE_PERM) {
