@@ -18,16 +18,16 @@ export function template() {
         <h1>你好2</h1>
       </div>
       <div class=div key=5>
-        <h1>你好2</h1>
+        <h1>你好5</h1>
       </div>
       <div class=div key=3>
-        <h1>你好2</h1>
+        <h1>你好3</h1>
       </div>
       <div class=div key=5>
-        <h1>你好2</h1>
+        <h1>你好5</h1>
       </div>
       <div class=div key=4>
-        <h1>你好2</h1>
+        <h1>你好4</h1>
       </div>
     `
 }
@@ -51,10 +51,19 @@ export function template2() {
         <h1>你好2</h1>
       </div>
       <span>2</span>
+      <div class=div key=3>
+        <h1>你好3</h1>
+      </div>
       <span>4</span>
       <span>6</span>
-      <div class=div key=1>
-        <h1>你好2</h1>
+      <div class=div key=5>
+        <h1>你好5</h1>
+      </div>
+      <div class=div key=5>
+        <h1>你好5</h1>
+      </div>
+      <div class=div key=4>
+        <h1>你好4</h1>
       </div>
   `
 }

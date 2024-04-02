@@ -613,7 +613,6 @@
 
     runTask(isAsync) {
       isAsync = isAsync === void 0 ? false : isAsync
-      isAsync = true
       if (!this.tasks.length) return
       const oldCount = this.count
       if (isAsync) {
@@ -728,6 +727,7 @@
       }
       let keyStartIndex = 0
       const useNodeKeys = []
+      const dUseNodeKeys = []
       for (index; index < vnode.length; index++) {
         let n1 = vnode[index];
         let n2 = rnode[index];
@@ -739,15 +739,31 @@
         if (n1[KEY] !== null && (!n2 || n2[KEY] !== n1[KEY])) {
           const on2 = n2
           n2 = null
-          while (keyStartIndex < rnode.length) {
+          {
+            for (let i = 0; i < dUseNodeKeys.length; i++) {
+              const node2 = dUseNodeKeys[i];
+              if (node2[KEY] === n1[KEY]) {
+                n2 = node2
+                dUseNodeKeys.splice(i, 1)
+                break
+              }
+            }
+          }
+          while (keyStartIndex < rnode.length && !n2) {
             const keyN2 = rnode[keyStartIndex]
             if (keyN2[KEY] !== null && keyN2[KEY] === n1[KEY]) {
               n2 = keyN2
               keyStartIndex++
-              useNodeKeys.push(n2)
               break
+            } else {
+              if (keyN2[KEY] !== null) {
+                dUseNodeKeys.push(keyN2)
+              }
             }
             keyStartIndex++
+          }
+          if (n1) {
+            useNodeKeys.push(n2)
           }
           if (on2 && n2 !== on2) {
             diffStore.diff3(on2)
@@ -774,7 +790,6 @@
   }
 
   function runDiffStore(diffStore, n1, n2, parent, diffManager) {
-    console.log(diffStore);
     const didUseState = diffStore.didUseState
     for (let i = 0; i < didUseState.length; i++) {
       if (didUseState[i] && didUseState[i].el) {
@@ -865,7 +880,7 @@
     }
     n2.splice(0, n2.length, ...nodes)
     nodes.splice(0, nodes.length)
-    // diffStore.clear()
+    diffStore.clear()
   }
 
   function setAttribute2(n1, n2, CURRENT_NODE_PERM) {
