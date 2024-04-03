@@ -41,7 +41,7 @@
   function patchParseVnodeAttrs(node) {
     if (node.props && node.props.attrs) {
       var attrs = {}
-      for (var [index, attr] of node.props.attrs) {
+      for (var attr of node.props.attrs) {
         const attrName = attr.nodeName, attrValue = attr.nodeValue;
         attrs[attrName] = attrValue
       }
@@ -55,51 +55,79 @@
     COMMENT_NODE: 8,
   }
 
+  function _s(...args) {
+    return JSON.stringify(...args)
+  }
+
+  const transformOptions = {
+    TEXTREF: ["{{", "}}"]
+  }
+
+  function patchTextContent(nodeValue) {
+    var startr = transformOptions.TEXTREF[0], endr = transformOptions.TEXTREF[1];
+    if (!(nodeValue.indexOf(startr) > -1 && nodeValue.indexOf(endr) > -1)) {
+      return nodeValue
+    }
+    var content = nodeValue.split(new RegExp(`(${startr})|(${endr})`, 'g')).filter(Boolean);
+    var nContent = `[`
+    var flag = true
+    for (let i = 0; i < content.length; i++) {
+      const c = content[i];
+      if (c !== startr && content[i - 1] === startr && content[i + 1] === endr) {
+        nContent = nContent.slice(0, -5)
+        nContent += `${c},`
+        flag = false
+        continue
+      }
+      if (flag) {
+        nContent += `'${c}',`
+      }
+      flag = true
+    }
+    nContent += "''].join('')"
+    return nContent
+  }
+
+  function transformParseVnode(vnode, st = 1) {
+    if (!vnode) return vnode
+    var hs = ""
+    for (var i = 0; i < vnode.length; i++) {
+      const node = vnode[i];
+      let n = null
+      switch (node.type) {
+        case NODE.ELEMENT_NODE:
+          hs += (`createVnode('${node.tag}',${_s(patchParseVnodeAttrs(node))}, ${transformParseVnode(node.children, st + 1)}),`)
+          break
+        case NODE.TEXT_NODE:
+          hs += (`createVnodeText(${patchTextContent(node.nodeValue)}),`)
+          break
+        case NODE.COMMENT_NODE:
+          hs += (`createVnodeComment(node.nodeValue),`)
+          break
+      }
+      console.log(hs);
+      var sst = "\t".repeat(st);
+      return `\n\n${sst}[${hs}]\n\n${sst}`
+    }
+  }
+
   function transfrom$$(options) {
     if (!options) return
     const { template } = options
     const parseNodes = baseParse(template)
-    function transformParseVnode(vnode) {
-      if (!vnode) return vnode
-      var nodes = []
-      for (var i = 0; i < vnode.length; i++) {
-        const node = vnode[i];
-        let n = null
-        switch (node.type) {
-          case NODE.ELEMENT_NODE:
-            n = createVnode(node.tag, patchParseVnodeAttrs(node), transformParseVnode(node.children))
-            break
-          case NODE.TEXT_NODE:
-            n = createVnodeText(node.nodeValue)
-            break
-          case NODE.COMMENT_NODE:
-            n = createVnodeComment(node.nodeValue)
-            break
-        }
-        if (n) {
-          nodes.push(n)
-        }
-        return nodes
-      }
-    }
-    return new Function('options,parseNodes,vnodeHooks,transformParseOptions', `
-      var {transformParseVnode} = transformParseOptions
+    return new Function('options,vnodeHooks', `
       var { data } = options
       data = typeof data === "function" ? data() : data
       var { createVnode,createVnodeText,createVnodeComment } = vnodeHooks
-      function _with(arg){
-        with(data){
-          return transformParseVnode(parseNodes)
-        }
-      }
       return ()=>{
-        return _with([])
+          with(data){
+            return (${transformParseVnode(parseNodes)})
+          }
       }
     
-    `)(options, parseNodes, vnodeHooks, {
-      transformParseVnode: transformParseVnode
-    })
+    `)(options, vnodeHooks)
   }
+
 
   const ctx = transfrom$$({
     data() {
@@ -109,8 +137,9 @@
     },
     template: `
     
-        <div>
+        <div class="root">
           
+            <button>点击{{ num.value }}{{1}}}</button>
             <button>点击</button>
           
         </div>
