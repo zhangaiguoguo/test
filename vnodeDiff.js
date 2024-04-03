@@ -90,10 +90,6 @@
     })
   }
 
-  function nodeType(node) {
-
-  }
-
   function createVnodeArg2(target) {
     return toRawType(target) === "Object"
   }
@@ -291,12 +287,13 @@
     }
     var KEY_PERM = 0b000000;
 
-    if (!n1 || !n2) return KEY_PERM
-
     if (n1[KEY] !== null && n1[KEY] !== void 0) {
       KEY_PERM = KEY_PERM | KEY_PERM_N1_PERM;
     }
-    if (n2[KEY] !== null && n2[KEY] !== void 0) {
+
+    if (!n2) return KEY_PERM
+
+    if (n2 && n2[KEY] !== null && n2[KEY] !== void 0) {
       KEY_PERM = KEY_PERM | KEY_PERM_N2_PERM;
     }
 
@@ -735,7 +732,6 @@
           diffStore.diff3(n2)
           n2 = null
         }
-        var count;
         if (n1[KEY] !== null && (!n2 || n2[KEY] !== n1[KEY])) {
           const on2 = n2
           n2 = null
@@ -771,11 +767,14 @@
         }
         if (!n2) {
         } else {
-          count = diffStore.diff(n1, n2)
           if (n2 && (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2))) {
             diffStore.diff3(n2)
             n2 = null
           }
+        }
+        let count = 0
+        if (n2 && n2 === rnode[index]) {
+          count = diffStore.diff(n1, n2)
         }
         diffStore.push2(n1, n2, count)
         var ncn = diffStore.useState.at(-1)
@@ -861,9 +860,13 @@
           }
         } else {
           let newChildren = cn.children || [];
+          let vnChildren = nn1.children
+          if (typeof vnChildren === "string") {
+            vnChildren = [createVnodeText(vnChildren)]
+          }
           diffManager.push({
             run: () => {
-              cn.children = vNodeCompareDiffRun(nn1.children, newChildren, cn.el, diffManager)
+              cn.children = vNodeCompareDiffRun(vnChildren, newChildren, cn.el, diffManager)
             }
           })
           diffManager.runTask()
@@ -937,7 +940,7 @@
   const KEY = "key"
 
   return {
-    h: createVnode,
+    createVnode,
     createVnodeText,
     createVnodeComment,
     parseNodeTree,

@@ -19,7 +19,7 @@ function createParserContext(
 }
 
 const defaultBaseParseOptions = {
-    isShowParseTime: true
+    isShowParseTime: false
 }
 
 export function baseParse(template, options = defaultBaseParseOptions) {
@@ -212,15 +212,19 @@ function parseElementFilter(content, ancestors, tagName, tagExec) {
 }
 
 function parseElement(context, ancestors) {
-    const parent = last(ancestors)
     const tag = /^<\/?([a-z][^\t\r\n\f />]*)/i.exec(context.source)
     const tagName = tag[1];
     parseElementFilter(context, ancestors, tagName, tag)
     const node = ancestorsPush(context, ancestors, tagName)
     advanceBy(context, tagName.length + 1);
     parseAttrs(context, ancestors)
-    const endIndex = /(\/?>)/.exec(context.source);
-    let tagContext = context.source.slice(0, endIndex?.index + endIndex[0].length);
+    let endIndex = /(\/?>)/.exec(context.source);
+    if (!endIndex) {
+        endIndex = context.length
+    } else {
+        endIndex = endIndex?.index + endIndex[0].length
+    }
+    let tagContext = context.source.slice(0, endIndex);
     let isSingleLabel = false
     if (tagContext[tagContext.length - 1] === ">") {
         isSingleLabel = tagContext[tagContext.length - 2] === "/"
@@ -233,9 +237,10 @@ function parseElement(context, ancestors) {
     } else {
         specialLabelProcessing(context, ancestors)
     }
-    if (context.source) {
+    const parent = last(ancestors)
+    if (context.source && parent) {
         const children = parseChildren(context, ancestors)
-        node.children = children
+        parent.children = children
     }
     return node
 }
@@ -305,8 +310,8 @@ function isTagStartEndLabel(context) {
 
 function parseAttrs$(context, node) {
     let attrs = []
-    const offset  = context.offset
-    while (!isTagStartEndLabel(context)) {
+    const offset = context.offset
+    while (!isTagStartEndLabel(context) && context.source) {
         const s = context.source
         let index = s.indexOf("="), index2 = /(\/?>)/ms.exec(s), index3 = s.indexOf(" ");
         let match = null

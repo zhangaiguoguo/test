@@ -1,59 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-  </head>
 
-  <body class="body">
-    <button class="switch">点击切换</button>
-    <button class="switch2">点击切换2</button>
-    <button class="switch3">点击切换3(null)</button>
-    <div id="root"></div>
-  </body>
-  <script src="./jquery.js"></script>
-  <script src="./index.js"></script>
-  <script src="./pinia.js"></script>
-  <script type="module">
-    import { template, template2, template3 } from "./template.js";
-    import { baseParse, transform } from "./baseParse.js";
-    import "./vnodeDiff.js";
-    const { render, transform: transform2 } = vnodeHooks;
-    var vnode = transform(baseParse(template()), transform2);
-    var vnode2 = transform(baseParse(template2()), transform2);
-    var vnode3 = transform(baseParse(template3()), transform2);
-    const renderRun = render($("#root")[0], vnode);
-    $("button.switch").click(() => {
-      renderRun(vnode);
-    });
-    $("button.switch2").click(() => {
-      renderRun(vnode2);
-    });
-    $("button.switch3").click(() => {
-      renderRun(vnode3);
-    });
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document</title>
+</head>
 
-  </script>
+<body class="body">
+  <button class="switch">点击切换</button>
+  <button class="switch2">点击切换2</button>
+  <button class="switch3">点击切换3(null)</button>
+  <div id="root"></div>
+</body>
+<script src="./jquery.js"></script>
+<script src="./index.js"></script>
+<script src="./pinia.js"></script>
+<script type="module">
+  import { template, template2, template3 } from "./template.js";
+  import { baseParse, transform } from "./baseParse.js";
+  import "./vnodeDiff.js";
+  const { render, transform: transform2, createVnode, createVnodeText, createVnodeComment } = vnodeHooks;
+  var vnode = transform(baseParse(template()), transform2);
+  var vnode2 = transform(baseParse(template2()), transform2);
+  var vnode3 = transform(baseParse(template3()), transform2);
+  const renderRun = render($("#root")[0], vnode);
+  $("button.switch").click(() => {
+    renderRun(vnode);
+  });
+  $("button.switch2").click(() => {
+    renderRun(vnode2);
+  });
+  $("button.switch3").click(() => {
+    renderRun(
+      [
+      ]
+    );
+  });
 
-  <script>
-    // console.log(hooks);
-    // console.log(pinia)
-    // pinia.installReactiveHooks(hooks)
-    // pinia.createPinia()
-    // const stateStore = pinia.defineStore('state',{
-    //   state(){
-    //     return {
-    //       num:1
-    //     }
-    //   },
-    //   getters:{
+  function patchParseVnodeAttrs(node) {
+    if (node.props && node.props.attrs) {
+      var attrs = {}
+      for (var [index, attr] of node.props.attrs) {
+        const attrName = attr.nodeName, attrValue = attr.nodeValue;
+        attrs[attrName] = attrValue
+      }
+      return attrs
+    }
+  }
 
-    //   },
-    //   actions:{
+  var NODE = typeof Node === "function" ? Node : {
+    TEXT_NODE: 3,
+    ELEMENT_NODE: 1,
+    COMMENT_NODE: 8,
+  }
 
-    //   }
-    // })
-    // console.log(stateStore);
-  </script>
+  function transfrom$$(options) {
+    if (!options) return
+    const { template } = options
+    const parseNodes = baseParse(template)
+    function transformParseVnode(vnode) {
+      if (!vnode) return vnode
+      var nodes = []
+      for (var i = 0; i < vnode.length; i++) {
+        const node = vnode[i];
+        let n = null
+        switch (node.type) {
+          case NODE.ELEMENT_NODE:
+            n = createVnode(node.tag, patchParseVnodeAttrs(node), transformParseVnode(node.children))
+            break
+          case NODE.TEXT_NODE:
+            n = createVnodeText(node.nodeValue)
+            break
+          case NODE.COMMENT_NODE:
+            n = createVnodeComment(node.nodeValue)
+            break
+        }
+        if (n) {
+          nodes.push(n)
+        }
+        return nodes
+      }
+    }
+    return new Function('options,parseNodes,vnodeHooks,transformParseOptions', `
+      var {transformParseVnode} = transformParseOptions
+      var { data } = options
+      data = typeof data === "function" ? data() : data
+      var { createVnode,createVnodeText,createVnodeComment } = vnodeHooks
+      function _with(arg){
+        with(data){
+          return transformParseVnode(parseNodes)
+        }
+      }
+      return ()=>{
+        return _with([])
+      }
+    
+    `)(options, parseNodes, vnodeHooks, {
+      transformParseVnode: transformParseVnode
+    })
+  }
+
+  const ctx = transfrom$$({
+    data() {
+      return {
+        num: hooks.ref(1)
+      }
+    },
+    template: `
+    
+        <div>
+          
+            <button>点击</button>
+          
+        </div>
+
+    `,
+  })
+
+  console.log(ctx());
+  console.log(ctx);
+
+</script>
+
+<script>
+  // console.log(hooks);
+  // console.log(pinia)
+  // pinia.installReactiveHooks(hooks)
+  // pinia.createPinia()
+  // const stateStore = pinia.defineStore('state',{
+  //   state(){
+  //     return {
+  //       num:1
+  //     }
+  //   },
+  //   getters:{
+
+  //   },
+  //   actions:{
+
+  //   }
+  // })
+  // console.log(stateStore);
+</script>
+
 </html>
