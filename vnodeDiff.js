@@ -644,7 +644,7 @@
       })
       const startTime = Date.now()
       this.runTask(isAsync)
-      console.log("耗时:", Date.now() - startTime);
+      // console.log("耗时:", Date.now() - startTime);
     }
 
     runDiff(vnode, isAsync) {
@@ -656,6 +656,7 @@
   }
 
   const VNODE_CREATE_CHILDREN = 0b00001
+  const VNODE_AUTO_ADDEVENT = 0b00010
 
   function vnodeSpecialLabelRun(n) {
     if (n.tag === "script") {
@@ -677,10 +678,13 @@
       }))
       this.el = createRNode(this)
       setNodeAttrs(this.el, this.attrs)
-      if ((VNODE_OPERATE_PERM & VNODE_CREATE_CHILDREN) === VNODE_CREATE_CHILDREN) {
+      if (isCurrentScopeExist(VNODE_OPERATE_PERM, VNODE_CREATE_CHILDREN)) {
         if (isSpecialLabel(this.tag)) {
           vnodeSpecialLabelRun(this)
         }
+      }
+      if (getNodeRefType(this) === ELEMENTREF2 && isCurrentScopeExist(VNODE_OPERATE_PERM, VNODE_AUTO_ADDEVENT)) {
+        setNodeEvts(this.el, this._vnode, null)
       }
     }
     append(parentNode) {
@@ -694,12 +698,16 @@
 
   const VNODE_OPERATE_PERM = 0b00001
 
+  function notKeySame(n1, n2) {
+    return n1 !== n2 && n1[KEY] === null && n1[KEY] === null
+  }
+
   function vNodeCompareDiffRun(vnode, rnode, parent, diffManager) {
     if (!vnode) return rnode
     if (!rnode.length && vnode.length) {
       for (let i = 0; i < vnode.length; i++) {
         if (vnode[i] === null) continue
-        const node = new VNode(vnode[i], VNODE_OPERATE_PERM)
+        const node = new VNode(vnode[i], VNODE_OPERATE_PERM | VNODE_AUTO_ADDEVENT)
         if (parent) {
           node.append(parent)
         }
@@ -773,7 +781,7 @@
           }
         }
         let count = 0
-        if (n2 && n2 === rnode[index]) {
+        if (n2 && n2 === rnode[index] && notKeySame(n1, n2)) {
           count = diffStore.diff(n1, n2)
         }
         diffStore.push2(n1, n2, count)
@@ -879,11 +887,51 @@
       }
       cn.el.__node__ = (cn._vnode = nn1)
       cn.key = nn1.key
+      setNodeEvts(cn.el, nn1, cn)
       nodes.unshift(cn)
     }
     n2.splice(0, n2.length, ...nodes)
     nodes.splice(0, nodes.length)
     diffStore.clear()
+  }
+
+  function setNodeEvts(el, n1, n2) {
+    const [evts1, evts2] = [n1.evts, n2 && n2.evts]
+    const evt1Keys = evts1 ? keys(evts1) : [];
+    const evt2Keys = evts2 ? keys(evts2) : [];
+    if (!evt2Keys.length && evt1Keys.length) {
+      for (let eventKey in evts1) {
+        addEventListener(el, eventKey, evts1[eventKey])
+      }
+    } else if (evt2Keys.length && !evt1Keys.length) {
+      for (let eventKey in evts1) {
+        removeEventListener(el, eventKey, evts1[eventKey])
+      }
+    } else {
+      for (let k in evts1) {
+        if (evts1[k] !== evts2[k]) {
+          addEventListener(el, k, evts1[k])
+          continue
+        }
+        {
+          const subIndex = evt2Keys.indexOf(k)
+          if (subIndex !== -1) {
+            evt2Keys.splice(subIndex, 1)
+          }
+        }
+      }
+      for (let i = 0; i < evt2Keys.length; i++) {
+        removeEventListener(el, evt2Keys[i], evts2[evt2Keys[i]])
+      }
+    }
+  }
+
+  function addEventListener(el, key, fn, options) {
+    el.addEventListener(key, fn, options)
+  }
+
+  function removeEventListener(el, key, fn, options) {
+    el.removeEventListener(key, fn, options)
   }
 
   function setAttribute2(n1, n2, CURRENT_NODE_PERM) {
@@ -944,7 +992,7 @@
     createVnodeText,
     createVnodeComment,
     parseNodeTree,
-    render: (dom, _vnode) => {
+    rendering: (dom, _vnode) => {
       let diffFiber = null
       function render(vnode, isAsync) {
         if (!diffFiber) {

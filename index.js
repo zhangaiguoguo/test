@@ -7,7 +7,7 @@
         return factory(w);
       }(module.exports)
   } else {
-    window.hooks = factory(global);
+    window.reactiveHooks = factory(global);
   }
 }(typeof window !== "undefined" ? window : this, function (window, noGlobal) {
   'use strict';
@@ -431,7 +431,7 @@
   }
 
   function __toValue(target) {
-    if (target && (isReactiveSensitive(target) || target.is_ref === true)) {
+    if (target && (target._is_ref === true)) {
       return target.value
     }
     return target
@@ -504,9 +504,10 @@
       ref,
       getData
     } = target;
-    trackEffects(self.self, ref, "type")
     try {
-      return __toValue(self.isShallow ? getData() : setProxy(getData()));
+      trackEffects(self.self, ref, "type")
+      var result = getData();
+      return __toValue(self.isShallow ? result : result && result._is_ref ? result : setProxy(result));
     } catch (e) {
       log.warn1(e)
     }
@@ -571,9 +572,7 @@
       return configToolProxy[1].selfProxy
     }
     dep = dep || generateDep()
-    /* Configuration items for proxy dep */
     const config = createConfig(dep, target, root, rootDeps, isShallow)
-    /* It needs to be determined whether it is' Set 'or' Map '. If it is of these two types, it will be transferred to another proxy data method */
     let selfProxy;
     if (isSM(target)) {
       selfProxy = setProxySM.apply(config, [target, root, dep, rootDeps]);
@@ -739,8 +738,6 @@
       this.parent = currentWatcherScope
       try {
         currentWatcherScope = this
-        // const exa = new CollectDeps(this)
-        // exa.stop()
         return this.fu(this)
       } finally {
         currentWatcherScope = this.parent || null
@@ -965,7 +962,7 @@
         return !1;
       }
       this.get = !isHandler ? callback : callback.get;
-      this.set = callback.set || (() => log.warn1(""));
+      this.set = callback.set || (() => log.warn1("read only"));
       return !0;
     }
     get value() {
@@ -1202,7 +1199,7 @@
   function queueJob(job) {
     const i = queue.findIndex(i => i === job || i[JOB_KEY] === job[JOB_KEY])
     if (i === -1) {
-      job[JOB_KEY] = Date.now()
+      job[JOB_KEY] = Date.now() + queue.length + 1
       queue.push(job);
     } else
       queue.splice(i, 1, job);
@@ -1215,17 +1212,6 @@
       currentFlushPromise = resolvedPromise.then(flushJobs)
     }
   }
-  const getId = (job) => job.id == null ? Infinity : job.id;
-  const comparator = (a, b) => {
-    const diff = getId(a) - getId(b);
-    if (diff === 0) {
-      if (a.pre && !b.pre)
-        return -1;
-      if (b.pre && !a.pre)
-        return 1;
-    }
-    return diff;
-  };
 
   function callWithErrorHandling(fn, args) {
     let res;
@@ -1239,7 +1225,6 @@
 
   function flushJobs(seen) {
     isFlushing = true
-    queue.sort(comparator);
     seen = seen || new Map()
     const check = (job) => checkRecursiveUpdates(seen, job);
     try {
