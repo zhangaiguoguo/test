@@ -20,7 +20,7 @@
     import { template, template2, template3 } from "./template.js";
     import { baseParse, transform } from "./baseParse.js";
     import "./vnodeDiff.js";
-    import { createApp } from "./transformVnode/index.js";
+    import { createApp, getCurrentInstance } from "./transformVnode/index.js";
     const {
       rendering,
       transform: transform2,
@@ -73,6 +73,9 @@
         fn() {
           this.num++;
         },
+        fun() {
+          console.log(arguments);
+        },
       },
       computed: {
         numCom: {
@@ -85,9 +88,14 @@
         },
       },
       watch: {
-        num() {
-          console.log(arguments);
-        },
+        num: [
+          {
+            handler() {
+              console.log(arguments);
+            },
+          },
+          "fun",
+        ],
       },
     }).mount("#app");
 

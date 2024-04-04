@@ -1,5 +1,5 @@
 import { baseParse } from '../baseParse.js'
-import { isFunction, keys } from './utils.js';
+import { isFunction, isObject, isString, keys, transformArray } from './utils.js';
 var NODE =
   typeof Node === "function"
     ? Node
@@ -196,15 +196,39 @@ function initCtxData(options, ctx) {
 }
 
 function useWatch(sorcur, options, ctx) {
-  const _options = isFunction(options) ? { handler: options } : options
-  return () => {
-    let stop = null
-    ctx.scopes.run(() => {
-      stop = reactiveHooks.watch(new Function('ctx', `return ()=>{
-        with (ctx){
-          return ${sorcur}
+  const watches = transformArray(isFunction(options) ? { handler: options } : options)
+  for (let item in watches) {
+    if (isString(watches[item]) || isFunction(watches[item])) {
+      const sub = watches.find((ii) => isObject(ii))
+      if (!sub) {
+        watches[item] = {
+          handler: [watches[item]]
         }
-      }`)(ctx), _options.handler.bind(ctx), _options)
+        continue
+      }
+      sub.handler.push(watches[item])
+      watches.splice(item, 1)
+      item--
+      continue
+    }
+    watches[item].handler = transformArray(watches[item].handler)
+  }
+  return () => {
+    let stop = []
+    ctx.scopes.run(() => {
+      watches.forEach(item => {
+        const handlers = item.handler.map((fn) => {
+          return isString(fn) ? new Function('ctx', `with(ctx){return ${fn}}`)(ctx) : fn
+        })
+        stop.push(
+          reactiveHooks.watch(new Function('ctx', `return ()=>{
+            with (ctx){
+              return ${sorcur}
+            }
+          }`)(ctx), (...args) => {
+            handlers.forEach((fn) => fn.apply(ctx, [...args]))
+          }, item))
+      })
     })
     return stop
   }
@@ -228,6 +252,7 @@ function setCtxState(ctx) {
             return state[k][i]
           },
           set(v) {
+            triggerInstanceHook(ctx, "beforeUpdate", k, i, v, state[k][i])
             state[k][i] = v
           }
         })
@@ -242,10 +267,50 @@ function setCtxState(ctx) {
   runWatch(state.watch)
 }
 
+function triggerInstanceHook(ctx, key, ...args) {
+  transformArray(instances.get(ctx).hooks[key]).forEach((fn) => {
+    fn(...args)
+  })
+}
+
+let currentInstance = null
+
+function setInstanceHook(ctx, key, fn) {
+  instances.get(ctx).hooks[key] = (...args) => fn && fn.apply(ctx, [...args])
+}
+
+function installInstanceHooks(ctx, options) {
+
+  instances.set(ctx, {
+    hooks: {
+    },
+    parent: currentInstance
+  })
+
+  setInstanceHook(ctx, 'beforeCreate', options.beforeCreate)
+  setInstanceHook(ctx, 'beforeUpdate', options.beforeUpdate)
+  setInstanceHook(ctx, 'created', options.created)
+  setInstanceHook(ctx, 'updated', options.updated)
+  setInstanceHook(ctx, 'mounted', options.mounted)
+  setInstanceHook(ctx, 'beforeMount', options.beforeMount)
+  setInstanceHook(ctx, 'destroyed', options.destroyed)
+  setInstanceHook(ctx, 'beforeDestroy', options.beforeDestroy)
+
+  currentInstance = ctx
+
+  triggerInstanceHook(ctx, "beforeCreate")
+
+}
+
+function uninstallInstance(ctx) {
+  currentInstance = instances.get(ctx).parent || null
+}
+
 function createCtx(options, hooks) {
   const ctx = new Proxy(extend({
     options: options,
-    scopes: new reactiveHooks.EffectScope()
+    scopes: new reactiveHooks.EffectScope(),
+    $nextTick: reactiveHooks.nextTick
   }, hooks || {}), {
     get(target, key, reactive) {
       return Reflect.get(target, key, reactive)
@@ -254,6 +319,7 @@ function createCtx(options, hooks) {
       return Reflect.defineProperty(target, key, attribute)
     }
   })
+  installInstanceHooks(ctx, options)
   setCtxState(ctx)
   return ctx
 }
@@ -279,8 +345,6 @@ function useRender(options, ctx) {
 
 const instances = new WeakMap()
 
-console.log(instances);
-
 export function createApp(options) {
   if (!options) return
   var { el } = options
@@ -301,6 +365,7 @@ export function createApp(options) {
       if (o$el !== n$el) {
         unMounted(o$el)
         ctx.$el = n$el
+        triggerInstanceHook(ctx, 'beforeMount')
         ctx.updated()
       }
       return this
@@ -317,18 +382,28 @@ export function createApp(options) {
       ctx.scopes.run(() => {
         reactiveHooks.watchEffect(() => {
           renderHandle()
-        },{
-          onTrigger(){
-            
+          triggerInstanceHook(ctx, 'mounted')
+        }, {
+          onTrigger() {
+            triggerInstanceHook(ctx, "updated", ...arguments)
           }
         })
       })
     },
   })
   let [renderHandle] = useRender(options, ctx);
+
+  triggerInstanceHook(ctx, "created")
+
   if (el) {
     ctx.mount(el)
   }
 
+  uninstallInstance(ctx)
+
   return ctx
+}
+
+export function getCurrentInstance() {
+  return currentInstance
 }
