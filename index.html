@@ -17,42 +17,20 @@
   <script src="./index.js"></script>
   <script src="./pinia.js"></script>
   <script type="module">
-    import { template, template2, template3 } from "./template.js";
-    import { baseParse, transform } from "./baseParse.js";
     import "./vnodeDiff.js";
     import { createApp, getCurrentInstance } from "./transformVnode/index.js";
-    const {
-      rendering,
-      transform: transform2,
-      createVnode,
-      createVnodeText,
-      createVnodeComment,
-    } = vnodeHooks;
-    var vnode = transform(baseParse(template()), transform2);
-    var vnode2 = transform(baseParse(template2()), transform2);
-    var vnode3 = transform(baseParse(template3()), transform2);
-    const renderRun = rendering($("#root")[0], vnode);
-    $("button.switch").click(() => {
-      renderRun(vnode);
-    });
-    $("button.switch2").click(() => {
-      renderRun(vnode2);
-    });
-    $("button.switch3").click(() => {
-      renderRun([]);
-    });
 
     const data = {
       num: 100,
       name: "张三",
+      done: true,
     };
 
     const ctx = createApp({
       template: `
-
-        <div class="root">
+        <div :class="num % 2 ?'root':'root-2'">
             <div>div4</div>
-            <button @click="fn">点击{{ num }}</button>
+            <button @click="fn" :num="num">点击{{ num }}</button>
             <div>div1</div>
             <button>
               <span>
@@ -63,8 +41,10 @@
               <h1>我是{{ name }}</h1>  
             </div>
             <div>div3</div>
-        </div>
+            <input type="checkbox" @change=done=!done :checked="done"/>
+            <button @click="done = !done">切换</button>
 
+        </div>
     `,
       data() {
         return data;
@@ -86,16 +66,6 @@
             this.num = v;
           },
         },
-      },
-      watch: {
-        num: [
-          {
-            handler() {
-              console.log(arguments);
-            },
-          },
-          "fun",
-        ],
       },
     }).mount("#app");
 

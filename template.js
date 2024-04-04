@@ -1,7 +1,7 @@
 export function template() {
   return `
-      <button>點擊</button>
       <button key=1>點擊</button>
+      <button>點擊</button>
       <br/>
       <input/>
     `

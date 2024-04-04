@@ -1,5 +1,11 @@
-import { baseParse } from '../baseParse.js'
-import { isFunction, isObject, isString, keys, transformArray } from './utils.js';
+import { baseParse } from "../baseParse.js";
+import {
+  isFunction,
+  isObject,
+  isString,
+  keys,
+  transformArray,
+} from "./utils.js";
 var NODE =
   typeof Node === "function"
     ? Node
@@ -16,6 +22,7 @@ function _s(...args) {
 const transformOptions = {
   TEXTREF: ["{{", "}}"],
   EVENTREF: "@",
+  DYNAMICATTRREF: ":",
 };
 
 function patchTextContent(nodeValue) {
@@ -31,11 +38,7 @@ function patchTextContent(nodeValue) {
   var flag = true;
   for (let i = 0; i < content.length; i++) {
     const c = content[i];
-    if (
-      c !== startr &&
-      content[i - 1] === startr &&
-      content[i + 1] === endr
-    ) {
+    if (c !== startr && content[i - 1] === startr && content[i + 1] === endr) {
       nContent = nContent.slice(0, -5);
       nContent += `${c},`;
       flag = false;
@@ -52,37 +55,63 @@ function patchTextContent(nodeValue) {
 
 function patchParseEvent(key, content) {
   var { EVENTREF } = transformOptions;
-  const _key = key.slice(EVENTREF.length)
-  const ev = /(\(.*?\))/gms.test(content) ? content : `${content}($event)`
-  return [_key, ev]
+  const _key = key.slice(EVENTREF.length);
+  const ev = /(\(.*?\)|[\=\,\;\!\+\-\*\/\%]+)/gms.test(content) ? content : `${content}($event)`;
+  return [_key, ev];
+}
+
+function sliceCurrent(str, start, end = str.length) {
+  return str.slice(start, end);
 }
 
 function patchParseVnodeAttrs(node) {
   if (node.props && node.props.attrs) {
     var attrs = {};
     var evts = {};
-    var { EVENTREF } = transformOptions;
+    var dynamicAttrs = [];
+    var { EVENTREF, DYNAMICATTRREF } = transformOptions;
     for (var attr of node.props.attrs) {
-      const attrName = attr.nodeName,
+      let attrName = attr.nodeName,
         attrValue = attr.nodeValue;
-      if (attrName.slice(0, EVENTREF.length) === EVENTREF) {
-        let [eventKey, eventFn] = patchParseEvent(attrName, attrValue)
-        evts[eventKey] = eventFn
+      if (sliceCurrent(attrName, 0, EVENTREF.length) === EVENTREF) {
+        let [eventKey, eventFn] = patchParseEvent(attrName, attrValue);
+        evts[eventKey] = eventFn;
         continue;
+      } else if (
+        sliceCurrent(attrName, 0, DYNAMICATTRREF.length) === DYNAMICATTRREF
+      ) {
+        attrName = sliceCurrent(attrName, DYNAMICATTRREF.length);
+        dynamicAttrs.push(attrName);
       }
       attrs[attrName] = attrValue;
     }
-    return { attrs, evts };
+    return { attrs, evts, dynamicAttrs };
   }
 }
 
 function patchEventString(evts) {
-  let str = "{"
+  let str = "{";
   for (let w in evts) {
-    str += (`${w}:($event) => (${evts[w]})`)
+    str += `${w}:($event) => (${evts[w]})`;
   }
-  str += "}"
-  return str
+  str += "}";
+  return str;
+}
+
+function patchParseDynamicAttrs(attrs, dynamicAttrs) {
+  let str = "{";
+
+  for (let w in attrs) {
+    if (dynamicAttrs.indexOf(w) > -1) {
+      str += `${w} : ${attrs[w]} ,`;
+    } else {
+      str += `${w} : "${attrs[w]}" ,`;
+    }
+  }
+
+  str += "}";
+
+  return str;
 }
 
 function transformParseVnode(vnode, st = 1) {
@@ -94,21 +123,25 @@ function transformParseVnode(vnode, st = 1) {
     hs += "\n" + sts;
     switch (node.type) {
       case NODE.ELEMENT_NODE:
-        var { attrs, evts } = patchParseVnodeAttrs(node);
-        const evtStr = patchEventString(evts)
+        var { attrs, evts, dynamicAttrs } = patchParseVnodeAttrs(node);
+        const evtStr = patchEventString(evts);
         hs += `(function(){
-                  const node = createVnode('${node.tag}',${_s(
-          attrs
-        )}, ${transformParseVnode(node.children, st + 1)})
+                  const node = createVnode('${node.tag
+          }',${patchParseDynamicAttrs(
+            attrs,
+            dynamicAttrs
+          )}, ${transformParseVnode(node.children, st + 1)})
                   var currentRef = "${st}-${i + 1}"
-                  if(${keys(evts).length} > 0){
-                    if(evtMps[currentRef]){
-                      node.evts = evtMps[currentRef]
-                    }else{
-                      node.evts = ${evtStr}
-                      evtMps[currentRef] = node.evts
-                    }
-                  }
+                  ${keys(evts).length
+            ? `
+                  if(evtMps[currentRef]){
+                    node.evts = evtMps[currentRef]
+                  }else{
+                    node.evts = ${evtStr}
+                    evtMps[currentRef] = node.evts
+                  }`
+            : ""
+          }
                   return node
         })(),`;
         break;
@@ -126,7 +159,7 @@ function transformParseVnode(vnode, st = 1) {
 }
 
 function warn(...msg) {
-  return console.warn('[warn]', ...msg);
+  return console.warn("[warn]", ...msg);
 }
 
 function transfrom$$(template) {
@@ -144,23 +177,22 @@ function transfrom$$(template) {
           }
         }catch(err){
           warn(new SyntaxError(err.message))
+          return null
         }
       }
 
     `
   )(patchvNodeHooks, {
-    warn
+    warn,
   });
 }
 
-const extend = Object.assign
+const extend = Object.assign;
 
-const patchvNodeHooks = extend({
-
-}, vnodeHooks)
+const patchvNodeHooks = extend({}, vnodeHooks);
 
 function bind(fn, ctx) {
-  return fn.bind(ctx)
+  return fn.bind(ctx);
 }
 
 function initCtxData(options, ctx) {
@@ -170,240 +202,262 @@ function initCtxData(options, ctx) {
     data: reactiveHooks.reactive(_dataHandle.apply(ctx)),
     methods: {},
     computed: reactiveHooks.reactive({}),
-    watch: {}
-  }
+    watch: {},
+  };
   if (methods) {
     for (let w in methods) {
-      state.methods[w] = bind(methods[w], ctx)
+      state.methods[w] = bind(methods[w], ctx);
     }
   }
   if (computed) {
     for (let w in computed) {
-      const c = isFunction(computed[w]) ? {
-        get: computed[w]
-      } : computed[w];
-      c.get = c.get.bind(ctx)
-      c.set && (c.set = c.set.bind(ctx))
-      state.computed[w] = reactiveHooks.computed(c)
+      const c = isFunction(computed[w])
+        ? {
+          get: computed[w],
+        }
+        : computed[w];
+      c.get = c.get.bind(ctx);
+      c.set && (c.set = c.set.bind(ctx));
+      state.computed[w] = reactiveHooks.computed(c);
     }
   }
   if (watch) {
     for (let w in watch) {
-      state.watch[w] = useWatch(w, watch[w], ctx)
+      state.watch[w] = useWatch(w, watch[w], ctx);
     }
   }
-  return state
+  return state;
 }
 
 function useWatch(sorcur, options, ctx) {
-  const watches = transformArray(isFunction(options) ? { handler: options } : options)
+  const watches = transformArray(
+    isFunction(options) ? { handler: options } : options
+  );
   for (let item in watches) {
     if (isString(watches[item]) || isFunction(watches[item])) {
-      const sub = watches.find((ii) => isObject(ii))
+      const sub = watches.find((ii) => isObject(ii));
       if (!sub) {
         watches[item] = {
-          handler: [watches[item]]
-        }
-        continue
+          handler: [watches[item]],
+        };
+        continue;
       }
-      sub.handler.push(watches[item])
-      watches.splice(item, 1)
-      item--
-      continue
+      sub.handler.push(watches[item]);
+      watches.splice(item, 1);
+      item--;
+      continue;
     }
-    watches[item].handler = transformArray(watches[item].handler)
+    watches[item].handler = transformArray(watches[item].handler);
   }
   return () => {
-    let stop = []
+    let stop = [];
     ctx.scopes.run(() => {
-      watches.forEach(item => {
+      watches.forEach((item) => {
         const handlers = item.handler.map((fn) => {
-          return isString(fn) ? new Function('ctx', `with(ctx){return ${fn}}`)(ctx) : fn
-        })
+          return isString(fn)
+            ? new Function("ctx", `with(ctx){return ${fn}}`)(ctx)
+            : fn;
+        });
         stop.push(
-          reactiveHooks.watch(new Function('ctx', `return ()=>{
+          reactiveHooks.watch(
+            new Function(
+              "ctx",
+              `return ()=>{
             with (ctx){
               return ${sorcur}
             }
-          }`)(ctx), (...args) => {
-            handlers.forEach((fn) => fn.apply(ctx, [...args]))
-          }, item))
-      })
-    })
-    return stop
-  }
+          }`
+            )(ctx),
+            (...args) => {
+              handlers.forEach((fn) => fn.apply(ctx, [...args]));
+            },
+            item
+          )
+        );
+      });
+    });
+    return stop;
+  };
 }
 
 function runWatch(watchs) {
-  if (!watchs) return
+  if (!watchs) return;
   for (let k in watchs) {
-    watchs[k] = watchs[k]()
+    watchs[k] = watchs[k]();
   }
 }
 
 function setCtxState(ctx) {
-  const state = initCtxData(ctx.options, ctx)
-  ctx.state = state
+  const state = initCtxData(ctx.options, ctx);
+  ctx.state = state;
   for (let k in state) {
     if (k === "data" || k === "computed") {
       for (let i in state[k]) {
         Object.defineProperty(ctx, i, {
           get() {
-            return state[k][i]
+            return state[k][i];
           },
           set(v) {
-            triggerInstanceHook(ctx, "beforeUpdate", k, i, v, state[k][i])
-            state[k][i] = v
-          }
-        })
+            triggerInstanceHook(ctx, "beforeUpdate", k, i, v, state[k][i]);
+            state[k][i] = v;
+          },
+        });
       }
     }
     if (k === "methods") {
       for (let i in state[k]) {
-        ctx[i] = state[k][i]
+        ctx[i] = state[k][i];
       }
     }
   }
-  runWatch(state.watch)
+  runWatch(state.watch);
 }
 
 function triggerInstanceHook(ctx, key, ...args) {
   transformArray(instances.get(ctx).hooks[key]).forEach((fn) => {
-    fn(...args)
-  })
+    fn(...args);
+  });
 }
 
-let currentInstance = null
+let currentInstance = null;
 
 function setInstanceHook(ctx, key, fn) {
-  instances.get(ctx).hooks[key] = (...args) => fn && fn.apply(ctx, [...args])
+  instances.get(ctx).hooks[key] = (...args) => fn && fn.apply(ctx, [...args]);
 }
 
 function installInstanceHooks(ctx, options) {
-
   instances.set(ctx, {
-    hooks: {
-    },
-    parent: currentInstance
-  })
+    hooks: {},
+    parent: currentInstance,
+  });
 
-  setInstanceHook(ctx, 'beforeCreate', options.beforeCreate)
-  setInstanceHook(ctx, 'beforeUpdate', options.beforeUpdate)
-  setInstanceHook(ctx, 'created', options.created)
-  setInstanceHook(ctx, 'updated', options.updated)
-  setInstanceHook(ctx, 'mounted', options.mounted)
-  setInstanceHook(ctx, 'beforeMount', options.beforeMount)
-  setInstanceHook(ctx, 'destroyed', options.destroyed)
-  setInstanceHook(ctx, 'beforeDestroy', options.beforeDestroy)
+  setInstanceHook(ctx, "beforeCreate", options.beforeCreate);
+  setInstanceHook(ctx, "beforeUpdate", options.beforeUpdate);
+  setInstanceHook(ctx, "created", options.created);
+  setInstanceHook(ctx, "updated", options.updated);
+  setInstanceHook(ctx, "mounted", options.mounted);
+  setInstanceHook(ctx, "beforeMount", options.beforeMount);
+  setInstanceHook(ctx, "destroyed", options.destroyed);
+  setInstanceHook(ctx, "beforeDestroy", options.beforeDestroy);
 
-  currentInstance = ctx
+  currentInstance = ctx;
 
-  triggerInstanceHook(ctx, "beforeCreate")
-
+  triggerInstanceHook(ctx, "beforeCreate");
 }
 
 function uninstallInstance(ctx) {
-  currentInstance = instances.get(ctx).parent || null
+  currentInstance = instances.get(ctx).parent || null;
 }
 
 function createCtx(options, hooks) {
-  const ctx = new Proxy(extend({
-    options: options,
-    scopes: new reactiveHooks.EffectScope(),
-    $nextTick: reactiveHooks.nextTick
-  }, hooks || {}), {
-    get(target, key, reactive) {
-      return Reflect.get(target, key, reactive)
-    },
-    defineProperty(target, key, attribute) {
-      return Reflect.defineProperty(target, key, attribute)
+  const ctx = new Proxy(
+    extend(
+      {
+        options: options,
+        scopes: new reactiveHooks.EffectScope(),
+        $nextTick: reactiveHooks.nextTick,
+      },
+      hooks || {}
+    ),
+    {
+      get(target, key, reactive) {
+        return Reflect.get(target, key, reactive);
+      },
+      defineProperty(target, key, attribute) {
+        return Reflect.defineProperty(target, key, attribute);
+      },
     }
-  })
-  installInstanceHooks(ctx, options)
-  setCtxState(ctx)
-  return ctx
+  );
+  installInstanceHooks(ctx, options);
+  setCtxState(ctx);
+  return ctx;
 }
 
 function unMounted(el) {
-  if (!el) return
+  if (!el) return;
   for (let cEl of [...el.childNodes]) {
-    cEl.remove()
+    cEl.remove();
   }
 }
 
 function useRender(options, ctx) {
   const renderVnodeStructure = transfrom$$(options.template);
-  let renderHandle = null
-  return [() => {
-    if (!renderHandle) {
-      renderHandle = vnodeHooks.rendering(ctx.$el)
-    }
-    if (ctx.diffFiber) ctx.diffFiber.stop()
-    ctx.diffFiber = renderHandle(renderVnodeStructure(ctx))
-  }]
+  let renderHandle = null;
+  return [
+    () => {
+      if (!renderHandle) {
+        renderHandle = vnodeHooks.rendering(ctx.$el);
+      }
+      if (ctx.diffFiber) ctx.diffFiber.stop();
+      ctx.diffFiber = renderHandle(renderVnodeStructure(ctx));
+    },
+  ];
 }
 
-const instances = new WeakMap()
+const instances = new WeakMap();
 
 export function createApp(options) {
-  if (!options) return
-  var { el } = options
-  let isInitRendering = false
+  if (!options) return;
+  var { el } = options;
+  let isInitRendering = false;
   const ctx = createCtx(options, {
     destroyed() {
       if (ctx.$el) {
-        unMounted($el)
-        ctx.scopes.stop()
+        unMounted($el);
+        ctx.scopes.stop();
       }
     },
     mount(el) {
-      const o$el = ctx.$el
+      const o$el = ctx.$el;
       const n$el = el instanceof HTMLElement ? el : document.querySelector(el);
       if (!n$el) {
-        return warn(el, "is not a valid element")
+        return warn(el, "is not a valid element");
       }
       if (o$el !== n$el) {
-        unMounted(o$el)
-        ctx.$el = n$el
-        triggerInstanceHook(ctx, 'beforeMount')
-        ctx.updated()
+        unMounted(o$el);
+        ctx.$el = n$el;
+        triggerInstanceHook(ctx, "beforeMount");
+        ctx.updated();
       }
-      return this
+      return this;
     },
     updated() {
       if (!renderHandle) {
-        warn("Not mounted on real elements")
-        return
+        warn("Not mounted on real elements");
+        return;
       }
       if (isInitRendering) {
-        return renderHandle()
+        return renderHandle();
       }
-      isInitRendering = true
+      isInitRendering = true;
       ctx.scopes.run(() => {
-        reactiveHooks.watchEffect(() => {
-          renderHandle()
-          triggerInstanceHook(ctx, 'mounted')
-        }, {
-          onTrigger() {
-            triggerInstanceHook(ctx, "updated", ...arguments)
+        reactiveHooks.watchEffect(
+          () => {
+            renderHandle();
+            triggerInstanceHook(ctx, "mounted");
+          },
+          {
+            onTrigger() {
+              triggerInstanceHook(ctx, "updated", ...arguments);
+            },
           }
-        })
-      })
+        );
+      });
     },
-  })
+  });
   let [renderHandle] = useRender(options, ctx);
 
-  triggerInstanceHook(ctx, "created")
+  triggerInstanceHook(ctx, "created");
 
   if (el) {
-    ctx.mount(el)
+    ctx.mount(el);
   }
 
-  uninstallInstance(ctx)
+  uninstallInstance(ctx);
 
-  return ctx
+  return ctx;
 }
 
 export function getCurrentInstance() {
-  return currentInstance
+  return currentInstance;
 }

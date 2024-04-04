@@ -525,9 +525,8 @@
           n2: n
         })
         if (cn2) {
-          this.diff3(cn2, cn)
+          this.didUseState.push(cn2)
         }
-        return true
       } else if (!flag) {
         this.didUseState.push(n)
       }
@@ -934,6 +933,25 @@
     el.removeEventListener(key, fn, options)
   }
 
+  function patchSpecialNodeAttr(node, key, value) {
+    const tagName = node.tagName
+    if (key === "value") {
+      switch (tagName) {
+        case "INPUT":
+        case "SELECT":
+        case "TEXTAREA":
+          node.value = value
+          break
+      }
+    }else if(key === "checked"){
+      switch (tagName) {
+        case "INPUT":
+          node.checked = !!value
+          break
+      }
+    }
+  }
+
   function setAttribute2(n1, n2, CURRENT_NODE_PERM) {
     let attrs = n1.attrs, attrs2 = n2.attrs;
     var el = n1.el || n2.el
@@ -944,6 +962,7 @@
         for (var k in attrs) {
           if (!attrs2 || attrs2[k] !== attrs[k]) {
             attrs2[k] = attrs[k]
+            patchSpecialNodeAttr(el, k, attrs2[k])
             el.setAttribute(k, attrs2[k])
           }
           if (attrs2Ks) {
@@ -958,6 +977,7 @@
     if (attrs2Ks && attrs2Ks.length) {
       for (let k = 0; k < attrs2Ks.length; k++) {
         el.removeAttribute(attrs2Ks[k])
+        patchSpecialNodeAttr(el, attrs2Ks[k], "")
         delete attrs2[attrs2Ks[k]]
       }
     }

@@ -215,6 +215,7 @@ function parseElement(context, ancestors) {
     const tag = /^<\/?([a-z][^\t\r\n\f />]*)/i.exec(context.source)
     const tagName = tag[1];
     parseElementFilter(context, ancestors, tagName, tag)
+    const parent = last(ancestors)
     const node = ancestorsPush(context, ancestors, tagName)
     advanceBy(context, tagName.length + 1);
     parseAttrs(context, ancestors)
@@ -237,10 +238,8 @@ function parseElement(context, ancestors) {
     } else {
         specialLabelProcessing(context, ancestors)
     }
-    const parent = last(ancestors)
-    if (context.source && parent) {
-        const children = parseChildren(context, ancestors)
-        parent.children = children
+    if (context.source && parent && !isSingleLabel) {
+        node.children = parseChildren(context, ancestors)
     }
     return node
 }
