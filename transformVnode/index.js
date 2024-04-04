@@ -125,7 +125,7 @@ function transformParseVnode(vnode, st = 1) {
       case NODE.ELEMENT_NODE:
         var { attrs, evts, dynamicAttrs } = patchParseVnodeAttrs(node);
         const evtStr = patchEventString(evts);
-        hs += `(function(){
+        hs += `(() => {
                   const node = createVnode('${node.tag
           }',${patchParseDynamicAttrs(
             attrs,
@@ -171,16 +171,17 @@ function transfrom$$(template) {
       var evtMps = {}
       var { createVnode,createVnodeText,createVnodeComment } = vnodeHooks
       return (ctx)=>{
-        try{
-          with(ctx){
-            return (${transformParseVnode(parseNodes, 4)})
+        return (function(){
+          try{
+            with(ctx){
+              return (${transformParseVnode(parseNodes, 4)})
+            }
+          }catch(err){
+            warn(new SyntaxError(err.message))
+            return null
           }
-        }catch(err){
-          warn(new SyntaxError(err.message))
-          return null
-        }
+        }).apply(ctx,[])
       }
-
     `
   )(patchvNodeHooks, {
     warn,

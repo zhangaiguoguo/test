@@ -40,7 +40,7 @@
             <div>
               <h1>我是{{ name }}</h1>  
             </div>
-            <div>div3</div>
+            <div>div3 {{this.done}}</div>
             <input type="checkbox" @change=done=!done :checked="done"/>
             <button @click="done = !done">切换</button>
 
