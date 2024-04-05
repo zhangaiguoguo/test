@@ -238,7 +238,7 @@ function parseElement(context, ancestors) {
     } else {
         specialLabelProcessing(context, ancestors)
     }
-    if (context.source && parent && !isSingleLabel) {
+    if (context.source && !isSingleLabel) {
         node.children = parseChildren(context, ancestors)
     }
     return node

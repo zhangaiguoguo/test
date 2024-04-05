@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
+    <style>
+      .root {
+        color: red;
+      }
+      .root-2 {
+        color: blue;
+      }
+    </style>
   </head>
 
   <body class="body">
@@ -30,20 +38,21 @@
       template: `
         <div :class="num % 2 ?'root':'root-2'">
             <div>div4</div>
-            <button @click="fn" :num="num">点击{{ num }}</button>
-            <div>div1</div>
-            <button>
+            <button :key="1" @click="fn" :num="num">点击{{ num }}</button>
+            <div if="num">div1</div>
+            <div if-else="2">div2</div>
+            <div if-else="3">div3</div>
+            <button a>
               <span>
                 <i>点击次数{{numCom}}</i>
               </span>
             </button>
             <div>
-              <h1>我是{{ name }}</h1>  
+              <h1>我是{{ name }}今年{{num}}岁了</h1>  
             </div>
             <div>div3 {{this.done}}</div>
             <input type="checkbox" @change=done=!done :checked="done"/>
             <button @click="done = !done">切换</button>
-
         </div>
     `,
       data() {
@@ -55,6 +64,13 @@
         },
         fun() {
           console.log(arguments);
+        },
+      },
+      watch: {
+        "this.done": {
+          handler() {
+            this.fn();
+          },
         },
       },
       computed: {

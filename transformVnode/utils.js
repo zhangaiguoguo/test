@@ -27,3 +27,10 @@ export function isObject(target) {
 export function transformArray(target) {
   return isArray(target) ? target : [target]
 }
+
+export function has(target, key) {
+  if (typeof target !== "object" || target === null) {
+    return false
+  }
+  return key in target || target.hasOwnProperty(key)
+}

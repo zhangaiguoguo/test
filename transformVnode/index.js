@@ -1,5 +1,7 @@
 import { baseParse } from "../baseParse.js";
 import {
+  has,
+  isArray,
   isFunction,
   isObject,
   isString,
@@ -29,18 +31,20 @@ function patchTextContent(nodeValue) {
   var startr = transformOptions.TEXTREF[0],
     endr = transformOptions.TEXTREF[1];
   if (!(nodeValue.indexOf(startr) > -1 && nodeValue.indexOf(endr) > -1)) {
-    return `"${nodeValue}"`;
+    return [`"${nodeValue}"`, false];
   }
   var content = nodeValue
     .split(new RegExp(`(${startr})|(${endr})`, "g"))
     .filter(Boolean);
   var nContent = `[`;
   var flag = true;
+  var done = false
   for (let i = 0; i < content.length; i++) {
     const c = content[i];
     if (c !== startr && content[i - 1] === startr && content[i + 1] === endr) {
       nContent = nContent.slice(0, -5);
       nContent += `${c},`;
+      done = true
       flag = false;
       continue;
     }
@@ -50,14 +54,91 @@ function patchTextContent(nodeValue) {
     flag = true;
   }
   nContent += "''].join('')";
-  return nContent;
+  return [nContent, done];
+}
+
+const extend = Object.assign;
+
+const patchvNodeHooks = extend({ h }, vnodeHooks);
+
+const COMPONENT_NODE = 0b001000;
+const ELEMENT_NODE = 0b000100;
+const TEXT_NODE = 0b000010;
+const COMMENT_NODE = 0b001001;
+const IS_V_NODE_REF = "_is_v_node";
+const COMPONENT_NODE_REF = Symbol("component");
+
+function parseHShapeFlag(type) {
+  if (isString(type)) {
+    if (/[^a-z0-9_-]+/gi.test(type)) {
+      return TEXT_NODE;
+    }
+    return ELEMENT_NODE;
+  }
+  return COMPONENT_NODE;
+}
+
+export function h(type, props, children) {
+  if (arguments.length === 2) {
+    if (isArray(props) || isString(props)) {
+      children = props;
+      props = {};
+    }
+  } else if (arguments.length === 1) {
+    props = {};
+  }
+  children = children
+    ? transformArray(children).map((child) =>
+      isString(child) || (isObject(child) && !child[IS_V_NODE_REF])
+        ? h(child)
+        : child
+    )
+    : null;
+  const key = has(props, "key") ? props.key : null;
+  const shapeFlag = has(props, "shapeFlag")
+    ? props.shapeFlag
+    : parseHShapeFlag(type);
+  let node = null;
+  switch (shapeFlag) {
+    case ELEMENT_NODE:
+      {
+        node = patchvNodeHooks.createVnode(
+          type,
+          { ...props, key: key },
+          children
+        );
+        node.shapeFlag = shapeFlag;
+        node[IS_V_NODE_REF] = true;
+      }
+      break;
+    case TEXT_NODE:
+      node = patchvNodeHooks.createVnodeText(type);
+      break;
+    case COMMENT_NODE:
+      node = patchvNodeHooks.createVnodeComment(type);
+      break;
+    default:
+      node = {
+        shapeFlag: COMMENT_NODE,
+        type: type,
+        children: children,
+        key,
+        props: null,
+        elementType: COMPONENT_NODE_REF,
+        el: null,
+      };
+  }
+  node[IS_V_NODE_REF] = !!1;
+  return node;
 }
 
 function patchParseEvent(key, content) {
   var { EVENTREF } = transformOptions;
   const _key = key.slice(EVENTREF.length);
-  const ev = /(\(.*?\)|[\=\,\;\!\+\-\*\/\%]+)/gms.test(content) ? content : `${content}($event)`;
-  return [_key, ev];
+  const ev = /(\(.*?\)|[\=\,\;\!\+\-\*\/\%]+)/gms.test(content)
+    ? content
+    : `${content}($event)`;
+  return [`"on-${_key}"`, ev];
 }
 
 function sliceCurrent(str, start, end = str.length) {
@@ -85,7 +166,7 @@ function patchParseVnodeAttrs(node) {
       }
       attrs[attrName] = attrValue;
     }
-    return { attrs, evts, dynamicAttrs };
+    return { attrs, dynamicAttrs, evts };
   }
 }
 
@@ -98,20 +179,33 @@ function patchEventString(evts) {
   return str;
 }
 
-function patchParseDynamicAttrs(attrs, dynamicAttrs) {
+function patchParseDynamicAttrs(attrs, dynamicAttrs, argStr = "") {
   let str = "{";
-
+  let dyKeyStr = null
   for (let w in attrs) {
-    if (dynamicAttrs.indexOf(w) > -1) {
-      str += `${w} : ${attrs[w]} ,`;
+    const flag = dynamicAttrs.indexOf(w) > -1
+    if (w === 'key') {
+      if (flag) {
+        dyKeyStr = `${attrs[w]}`
+      } else {
+        dyKeyStr = `"${attrs[w]}"`
+      }
+      continue
+    }
+    if (flag) {
+      str += `"${w}" : ${attrs[w]} ,`;
     } else {
-      str += `${w} : "${attrs[w]}" ,`;
+      str += `"${w}" : "${attrs[w]}" ,`;
     }
   }
 
-  str += "}";
+  str += (argStr + "}");
 
-  return str;
+  return [str, dyKeyStr];
+}
+
+function patchPropsNullMenu(propsStr, startStr = "", endStr = startStr) {
+  return propsStr.length <= 2 ? "" : `${startStr}...${propsStr}${endStr}`
 }
 
 function transformParseVnode(vnode, st = 1) {
@@ -123,37 +217,48 @@ function transformParseVnode(vnode, st = 1) {
     hs += "\n" + sts;
     switch (node.type) {
       case NODE.ELEMENT_NODE:
-        var { attrs, evts, dynamicAttrs } = patchParseVnodeAttrs(node);
+        var { attrs, dynamicAttrs, evts } = patchParseVnodeAttrs(node);
         const evtStr = patchEventString(evts);
-        hs += `(() => {
-                  const node = createVnode('${node.tag
-          }',${patchParseDynamicAttrs(
-            attrs,
-            dynamicAttrs
-          )}, ${transformParseVnode(node.children, st + 1)})
-                  var currentRef = "${st}-${i + 1}"
-                  ${keys(evts).length
-            ? `
-                  if(evtMps[currentRef]){
-                    node.evts = evtMps[currentRef]
-                  }else{
-                    node.evts = ${evtStr}
-                    evtMps[currentRef] = node.evts
-                  }`
-            : ""
-          }
-                  return node
+        const [attrsStr, keyStr] = patchParseDynamicAttrs(
+          attrs,
+          dynamicAttrs,
+        );
+        hs += `(()=>{
+              const node = h('${node.tag}',${!dynamicAttrs.length ? `{${patchPropsNullMenu(evtStr)}${patchPropsNullMenu(evtStr, ',')}${keyStr !== null ? `key:${keyStr}` : ''}}` : evtStr
+          }, ${transformParseVnode(node.children, st + 1)});
+              ${dynamicAttrs.length ? `
+                  fnMps.push(function(){
+                    node.attrs = ${attrsStr};${keyStr !== null ? `
+                    node.key = ${keyStr}` : ''}
+                  })
+              `: ``}
+              return node
         })(),`;
         break;
       case NODE.TEXT_NODE:
-        hs += `createVnodeText(${patchTextContent(node.nodeValue)}),`;
+        {
+          let [contentValue, flag] = patchTextContent(
+            node.nodeValue
+          );
+          hs += `(()=>{
+                    const node = h(${flag ? null : contentValue},{shapeFlag:${TEXT_NODE}})
+                    ${flag ? `
+                      fnMps.push(function(){
+                        node.content = ${contentValue}
+                      })
+                    `: ""}
+                    return node
+                })(),`;
+        }
         break;
       case NODE.COMMENT_NODE:
-        hs += `createVnodeComment(node.nodeValue),`;
+        hs += `h(node.nodeValue,{shapeFlag:${COMMENT_NODE}}),`;
         break;
     }
-    if (i < vnode.length - 1) hs += sts;
-    else hs += "\n" + sts;
+    if (vnode && vnode.length > 0) {
+      if (i < vnode.length - 1) hs += sts;
+      else hs += "\n" + sts;
+    }
   }
   return `[${hs}]`;
 }
@@ -165,32 +270,33 @@ function warn(...msg) {
 function transfrom$$(template) {
   const parseNodes = baseParse(template || "");
   return new Function(
-    "vnodeHooks,logHooks",
+    "hooks,logHooks",
     `
       var {warn} = logHooks
-      var evtMps = {}
-      var { createVnode,createVnodeText,createVnodeComment } = vnodeHooks
-      return (ctx)=>{
-        return (function(){
-          try{
-            with(ctx){
-              return (${transformParseVnode(parseNodes, 4)})
-            }
-          }catch(err){
-            warn(new SyntaxError(err.message))
-            return null
+      var fnMps = []
+      var { h } = hooks
+      var vn = null
+      return function(){
+        with(this){
+          if(!vn){
+            vn = (${transformParseVnode(parseNodes, 4)})
           }
-        }).apply(ctx,[])
+          for(let fn of fnMps){
+            fn.apply(this)
+          }
+          return vn
+        }
+        try{
+        }catch(err){
+          warn(new SyntaxError(err.message))
+          return null
+        }
       }
     `
   )(patchvNodeHooks, {
     warn,
   });
 }
-
-const extend = Object.assign;
-
-const patchvNodeHooks = extend({}, vnodeHooks);
 
 function bind(fn, ctx) {
   return fn.bind(ctx);
@@ -256,19 +362,15 @@ function useWatch(sorcur, options, ctx) {
       watches.forEach((item) => {
         const handlers = item.handler.map((fn) => {
           return isString(fn)
-            ? new Function("ctx", `with(ctx){return ${fn}}`)(ctx)
+            ? new Function("ctx", `with(ctx){return ${fn}}`).apply(ctx, [ctx])
             : fn;
         });
         stop.push(
           reactiveHooks.watch(
             new Function(
               "ctx",
-              `return ()=>{
-            with (ctx){
-              return ${sorcur}
-            }
-          }`
-            )(ctx),
+              `return ()=>{with (ctx){return ${sorcur}}}`
+            ).apply(ctx, [ctx]),
             (...args) => {
               handlers.forEach((fn) => fn.apply(ctx, [...args]));
             },
@@ -383,6 +485,7 @@ function unMounted(el) {
 
 function useRender(options, ctx) {
   const renderVnodeStructure = transfrom$$(options.template);
+  console.log(renderVnodeStructure);
   let renderHandle = null;
   return [
     () => {
@@ -390,7 +493,7 @@ function useRender(options, ctx) {
         renderHandle = vnodeHooks.rendering(ctx.$el);
       }
       if (ctx.diffFiber) ctx.diffFiber.stop();
-      ctx.diffFiber = renderHandle(renderVnodeStructure(ctx));
+      ctx.diffFiber = renderHandle(renderVnodeStructure.apply(ctx));
     },
   ];
 }
