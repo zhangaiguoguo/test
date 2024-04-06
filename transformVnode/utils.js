@@ -34,3 +34,7 @@ export function has(target, key) {
   }
   return key in target || target.hasOwnProperty(key)
 }
+
+export function indexOf(target, key) {
+  return target.indexOf(key) > -1
+}

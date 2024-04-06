@@ -183,6 +183,16 @@ export function attrWarnLog(context, current, preCurrent, value, node) {
     jsConsole.warn(error)
 }
 
+export function attrWarnLog2(context, current, preCurrent, value, node) {
+    const os = context.originalSource
+    const a = os.slice(0, current.loc.end.offset)
+    const subIndex = [getStrLastN(a, a.length - 1, 0)]
+    const subValue = [a.slice(subIndex[0])]
+    const endTipString = subValue[0] + '\n| ' + tipIconRepeat(current.loc.start.column - 1)
+    const error = new SyntaxError(`<${node.tag}> tag attribute (${value.trim()}) is invalid because it does not have (if)\n\t (at ${current.loc.start.line}:${current.loc.start.column})\n ` + a.slice(0, subIndex[0]) + endTipString)
+    jsConsole.warn(error)
+}
+
 export function warnLog(context) {
     const s = context.source
     const os = context.originalSource;

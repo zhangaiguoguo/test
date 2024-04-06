@@ -29,7 +29,7 @@
     import { createApp, getCurrentInstance } from "./transformVnode/index.js";
 
     const data = {
-      num: 100,
+      num: 1,
       name: "张三",
       done: true,
     };
@@ -39,9 +39,12 @@
         <div :class="num % 2 ?'root':'root-2'">
             <div>div4</div>
             <button :key="1" @click="fn" :num="num">点击{{ num }}</button>
-            <div if="num">div1</div>
-            <div if-else="2">div2</div>
-            <div if-else="3">div3</div>
+            <div if="num<10">div1</div>
+            <div :num="num" else-if="num<20">
+              div2
+              <h1 if="num>15">{{num > 15}}</h1>  
+            </div>
+            <div else-if="num<30">div3</div>
             <button a>
               <span>
                 <i>点击次数{{numCom}}</i>

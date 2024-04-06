@@ -1,4 +1,4 @@
-import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, isEndTag, warnLog, warnLog2, warnNotStartTag, warnLog3, warnNotEndTag, attrWarnLog } from "./utils.js"
+import { getCursor, getSelection, last, decodeEntities, isEnd, startsWith, transFormArray, extend, isEndTag, warnLog, warnLog2, warnNotStartTag, warnLog3, warnNotEndTag, attrWarnLog, attrWarnLog2 } from "./utils.js"
 function createParserContext(
     content,
     rawOptions,
@@ -60,7 +60,7 @@ function parseChildren(context, ancestors) {
                 }
                 break
             } else if (/[a-z]/i.test(s[1])) {
-                node = parseElement(context, ancestors)
+                node = parseElement(context, ancestors, nodes)
             } else if (startsWith(s, '<?')) {
                 node = parseBogusComment(context, ancestors)
             }
@@ -211,14 +211,14 @@ function parseElementFilter(content, ancestors, tagName, tagExec) {
     }
 }
 
-function parseElement(context, ancestors) {
+function parseElement(context, ancestors, nodes) {
     const tag = /^<\/?([a-z][^\t\r\n\f />]*)/i.exec(context.source)
     const tagName = tag[1];
     parseElementFilter(context, ancestors, tagName, tag)
     const parent = last(ancestors)
     const node = ancestorsPush(context, ancestors, tagName)
     advanceBy(context, tagName.length + 1);
-    parseAttrs(context, ancestors)
+    const parseAttreResult = parseAttrs(context, ancestors, nodes)
     let endIndex = /(\/?>)/.exec(context.source);
     if (!endIndex) {
         endIndex = context.length
@@ -241,7 +241,7 @@ function parseElement(context, ancestors) {
     if (context.source && !isSingleLabel) {
         node.children = parseChildren(context, ancestors)
     }
-    return node
+    return parseAttreResult ? null : node
 }
 
 function specialLabelProcessing(context, ancestors) {
@@ -288,12 +288,14 @@ function valideStrIndex0IsS(str) {
     return str[0] === " "
 }
 
+const conditionKeys = ['if', "else-if", "else"]
 
-function parseAttrs(context, ancestors) {
+function parseAttrs(context, ancestors, nodes) {
     const currentNode = last(ancestors)
-    const [source, attrs] = parseAttrs$(context, currentNode)
+    const [source, attrs, flag] = parseAttrs$(context, currentNode, nodes)
     currentNode.props.source = source
     currentNode.props.attrs = attrs
+    return flag
 }
 
 function isTagStartEndLabel(context) {
@@ -307,9 +309,10 @@ function isTagStartEndLabel(context) {
     }
 }
 
-function parseAttrs$(context, node) {
+function parseAttrs$(context, node, nodes) {
     let attrs = []
     const offset = context.offset
+    let isConditionNode = false
     while (!isTagStartEndLabel(context) && context.source) {
         const s = context.source
         let index = s.indexOf("="), index2 = /(\/?>)/ms.exec(s), index3 = s.indexOf(" ");
@@ -351,20 +354,25 @@ function parseAttrs$(context, node) {
             }
             match = s.slice(0, endIndex)
         }
-        attrs.push(useParseAttr(context, match, attrs, node))
+        const currentAttr = useParseAttr(context, match, attrs, node, nodes)
+        if (typeof currentAttr === "object" && currentAttr !== null) {
+            attrs.push(currentAttr)
+        } else if (currentAttr === 1) {
+            isConditionNode = true
+        }
         if (s[endIndex] === " ") {
             advanceBy(context, 1)
         }
         // break
     }
-    return [context.originalSource.slice(offset, context.offset), attrs]
+    return [context.originalSource.slice(offset, context.offset), attrs, isConditionNode]
 }
 
 function isSpecialSymbols(v) {
     return v === "'" || v === '"' || v === "`"
 }
 
-function useParseAttr(context, value, attrs, node) {
+function useParseAttr(context, value, attrs, node, nodes) {
     let splitIndex = value.indexOf("=");
     if (splitIndex === -1) {
         splitIndex = value.length
@@ -383,9 +391,36 @@ function useParseAttr(context, value, attrs, node) {
     }
     advanceBy(context, value.length)
     attr.loc.end = getCursor(context)
-    const prevAttr = attrs.find((i) => i.nodeName === nodeName)
+    const flag1 = conditionKeys.indexOf(nodeName) !== -1
+    const prevAttr = attrs.find((i) => flag1 ? conditionKeys.indexOf(i.nodeName) !== -1 : i.nodeName === nodeName)
     if (prevAttr) {
         attrWarnLog(context, attr, prevAttr, nodeName, node)
+    }
+    if (flag1) {
+        let flag = true
+        node.conditionValue = attr
+        if (nodeName === conditionKeys[0]) {
+            node.condition = [node]
+            return null
+        } else {
+            let index = nodes.length - 1;
+            while (index >= 0) {
+                const prevNode = nodes[index]
+                if (!prevNode.conditionValue || (prevNode.conditionValue.nodeName !== conditionKeys[1] && prevNode.conditionValue.nodeName !== conditionKeys[0])) {
+                    attrWarnLog2(context, attr, prevAttr, nodeName, node)
+                    flag = false
+                    break
+                }
+                if (prevNode.conditionValue.nodeName === conditionKeys[0]) {
+                    prevNode.condition.push(node)
+                    break
+                }
+                index--
+            }
+        }
+        if (flag) {
+            return 1
+        }
     }
     return attr
 }

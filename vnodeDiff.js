@@ -5,8 +5,8 @@
       typeof global === "object" && global.document
         ? factory(global, true)
         : (function (w) {
-            return factory(w);
-          })(module.exports);
+          return factory(w);
+        })(module.exports);
   } else {
     window.vnodeHooks = factory(global);
   }
@@ -108,7 +108,7 @@
       if ((isEventExec = eventExec(k))) {
         evts[
           k.slice(isEventExec.index + isEventExec[0].length) +
-            (isEventExec.at(-1) ? isEventExec.at(-1).toLocaleLowerCase() : "")
+          (isEventExec.at(-1) ? isEventExec.at(-1).toLocaleLowerCase() : "")
         ] = attrs[k];
         delete attrs[k];
         continue;
@@ -352,7 +352,7 @@
     didUseState = [];
     useState = [];
     diffKeyState = [];
-    static perms = [0b111111, 0b111101, 0b111111];
+    static perms = [0b1111111, 0b1111101, 0b1111111];
     counts = [];
     didUseState2 = [];
     diff3Status = [];
@@ -385,7 +385,7 @@
         return cCount.count;
       }
       let CURRENT_NODE_PERM = INIT_NODE_PERM();
-      var tf1 = null;
+      var tf1 = null, tf = null;
       if ((perm & DIFFTAGTYPE) === DIFFTAGTYPE) {
         tf1 = getNodeRefType(n1);
         let tf2 = getNodeRefType(n2);
@@ -398,7 +398,7 @@
       if (n1[KEY] !== null && n1[KEY] === n2[KEY]) {
         count += DIFFNODEKEY;
       }
-      if (tf1 && tf1 && tf1 !== ELEMENTREF2) {
+      if (tf1 && tf && tf1 !== ELEMENTREF2) {
         if (n1.content === n2.content) count += DIFFCHILDRENTREE;
       }
       if ((perm & DIFFNODETAG) === DIFFNODETAG && n1.tag === n2.tag) {
@@ -551,8 +551,8 @@
           index
             ? index[1] < count
             : true &&
-              (count > cn.count ||
-                (count === cn.count && cn.n2.tag === n.n1.tag))
+            (count > cn.count ||
+              (count === cn.count && cn.n2.tag === n.n1.tag))
         ) {
           if (usens.some((nn) => nn === cn)) continue;
           index = [i, count];
@@ -638,10 +638,10 @@
   const diffFiberAsyncRun =
     typeof requestAnimationFrame === "function"
       ? () => ({
-          then(fn) {
-            return requestAnimationFrame(fn);
-          },
-        })
+        then(fn) {
+          return requestAnimationFrame(fn);
+        },
+      })
       : () => Promise.resolve();
 
   class DiffFiber {
@@ -936,7 +936,8 @@
       let nn1 = nin.n1;
       let cnIsNewAddFlag = false;
       var CURRENT_NODE_PERM = null;
-      if (getNodeRefType(nn1) === ELEMENTREF2) {
+      let diffNodeType = null;
+      if (diffNodeType = (getNodeRefType(nn1) === ELEMENTREF2)) {
         const sub = diffStore.find(nn1, cn);
         if (sub) {
           CURRENT_NODE_PERM = sub.CURRENT_NODE_PERM;
@@ -968,7 +969,11 @@
             }
           } else {
             if (!cn.el.parentNode || !cn.el.parentNode.parentNode) {
-              cn.append(parent);
+              if (last) {
+                insertBefore(cn, last);
+              } else {
+                cn.append(parent);
+              }
             }
           }
           if (ocn) {
@@ -1015,10 +1020,12 @@
           diffManager.runTask();
         }
       }
-      if (cnIsNewAddFlag) {
-        cn.evts = {};
+      if(diffNodeType){
+        if (cnIsNewAddFlag) {
+          cn.evts = {};
+        }
+        setNodeEvts(cn.el, nn1, cn);
       }
-      setNodeEvts(cn.el, nn1, cn);
       if (!ocn) {
         if (CURRENT_NODE_PERM > 0) {
           setAttribute2(nn1, cn, CURRENT_NODE_PERM);
@@ -1182,13 +1189,13 @@
         var node2 =
           node.type === ELEMENT_NODE
             ? createVnode(
-                node.tag,
-                null,
-                isSpecialLabel(node.tag) ? node.nodeValue : null
-              )
+              node.tag,
+              null,
+              isSpecialLabel(node.tag) ? node.nodeValue : null
+            )
             : node.type === TEXT_NODE
-            ? createVnodeText(node.nodeValue)
-            : createVnodeComment(node.nodeValue);
+              ? createVnodeText(node.nodeValue)
+              : createVnodeComment(node.nodeValue);
         const events = {};
         if (attrs) {
           attrs$ = {};
