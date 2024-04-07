@@ -772,7 +772,7 @@
         createvNodeBloak((vbloak) => {
           return Object.assign(vbloak, this._vnode, {
             children: null,
-            attrs: extend({}, this._vnode.attrs),
+            attrs: this._vnode.attrs ? extend({}, this._vnode.attrs) : null,
           });
         })
       );
@@ -1020,7 +1020,7 @@
           diffManager.runTask();
         }
       }
-      if(diffNodeType){
+      if (diffNodeType) {
         if (cnIsNewAddFlag) {
           cn.evts = {};
         }
