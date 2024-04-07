@@ -131,6 +131,7 @@
       }
       nodeBloak.splice(1, 1, ..._args);
     }
+
     return createvNodeBloak((bloak) => {
       bloak.tag = nodeBloak[0];
       bloak.attrs = nodeBloak[1];
@@ -142,6 +143,19 @@
       }
       bloak[ELEMENTREF3] = nodeTypeSymbolFind(bloak.type);
       bloak.children = nodeBloak[2];
+      return bloak;
+    });
+  }
+
+  const FRAGMENT_NODE = 21
+  const FRAGMENT = Symbol('fragment')
+
+  function createVnodeFragment(tag, props, children) {
+    return createvNodeBloak((bloak) => {
+      bloak.tag = "#fragment";
+      bloak.type = FRAGMENT_NODE;
+      bloak[ELEMENTREF3] = FRAGMENT;
+      bloak.children = children;
       return bloak;
     });
   }
@@ -1169,6 +1183,7 @@
     createVnodeText,
     createVnodeComment,
     parseNodeTree,
+    createVnodeFragment,
     rendering: (dom, _vnode) => {
       let diffFiber = null;
       function render(vnode, isAsync) {

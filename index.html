@@ -30,9 +30,7 @@
   import "./vnodeDiff.js";
   import { createApp, getCurrentInstance, h } from "./transformVnode/index.js";
 
-  console.log(h('div', null, [{
-    default: () => h('div')
-  }]));
+  console.log(h('div', null, h(null, { shapeFlag: 1 }, [h('div', 1), h('div', 2)])));
 
   const data = {
     num: 1,
