@@ -108,36 +108,44 @@ const patchvNodeHooks = extend({ patchEventMemory, h }, vnodeHooks);
 const COMPONENT_NODE = 0b001000;
 const ELEMENT_NODE = 0b000100;
 const TEXT_NODE = 0b000010;
+const FRAGMENT_node = 0b000001
 const COMMENT_NODE = 0b001001;
 const IS_V_NODE_REF = "_is_v_node";
+const IS_V_NODE_COMPONENT_REF = "_is_v_component_node";
 const COMPONENT_NODE_REF = Symbol("component");
 
 function parseHShapeFlag(type) {
-  if (isString(type)) {
-    if (/[^a-z0-9_-]+/gi.test(type)) {
-      return TEXT_NODE;
-    }
-    return ELEMENT_NODE;
+  if (isObject(type)) {
+    return COMPONENT_NODE;
   }
-  return COMPONENT_NODE;
+  if (/[a-z]+[0-9_-]*?/gi.test(type)) {
+    return ELEMENT_NODE
+  }
+  return TEXT_NODE;
 }
 
-export function h(type, props, children) {
-  if (arguments.length === 2) {
-    if (isArray(props) || isString(props)) {
+export function h(type, props, children = null) {
+  const l = arguments.length
+  if (l === 2) {
+    if (props && (!isObject(props) || props[IS_V_NODE_REF])) {
       children = props;
-      props = {};
+      props = null;
     }
-  } else if (arguments.length === 1) {
-    props = {};
+  } else if (l === 1) {
+    props = null;
+    children = null
   }
-  children = children
-    ? transformArray(children).map((child) =>
-      isString(child) || (isObject(child) && !child[IS_V_NODE_REF])
-        ? h(child)
-        : child
-    )
-    : null;
+  if (children !== null && !isArray(children) && (l === 3 && isObject(children) ? has(children, IS_V_NODE_REF) : true)) {
+    children = transformArray(children)
+  }
+  if (isArray(children)) {
+    for (let i = 0; i < children.length; i++) {
+      const node = children[i];
+      if (!has(node, IS_V_NODE_REF)) {
+        children[i] = h(node, typeof node !== "object" ? { shapeFlag: TEXT_NODE } : null)
+      }
+    }
+  }
   const key = has(props, "key") ? props.key : null;
   const shapeFlag = has(props, "shapeFlag")
     ? props.shapeFlag
@@ -148,11 +156,9 @@ export function h(type, props, children) {
       {
         node = patchvNodeHooks.createVnode(
           type,
-          { ...props, key: key },
+          props ? { ...props, key: key } : null,
           children
         );
-        node.shapeFlag = shapeFlag;
-        node[IS_V_NODE_REF] = true;
       }
       break;
     case TEXT_NODE:
@@ -161,6 +167,9 @@ export function h(type, props, children) {
     case COMMENT_NODE:
       node = patchvNodeHooks.createVnodeComment(type);
       break;
+    case FRAGMENT_node:
+      node = patchvNodeHooks.createVnodeFragment(type, props, children);
+      break
     default:
       node = {
         shapeFlag: COMMENT_NODE,
@@ -173,6 +182,7 @@ export function h(type, props, children) {
       };
   }
   node[IS_V_NODE_REF] = !!1;
+  node.shapeFlag = shapeFlag;
   return node;
 }
 
@@ -267,15 +277,29 @@ function createCommentNode(v) {
   }
 }
 
-function patchNodeAttrs(node) {
+function patchNodeAttrs(node, variableName) {
   var { attrs, dynamicAttrs, evts } = patchParseVnodeAttrs(node);
   const [eventRefKey] = on(evts);
+  if (eventRefKey) {
+    variableName.push(`_static_resources_evts_${variableName.length + 1}`);
+  }
+  let evtStr = eventRefKey ? (`...(${variableName.at(-1)} || (${variableName.at(-1)} = patchEventMemory("${eventRefKey}", this)))`) : ""
   const [attrsStr, keyStr] = patchParseDynamicAttrs(
     attrs,
     dynamicAttrs,
-    eventRefKey ? (`...patchEventMemory("${eventRefKey}", this)`) : ""
+    evtStr
   );
-  return `{${attrsStr.slice(1, -1)}${keyStr !== null ? `${eventRefKey ? ',' : ''}key:${keyStr}` : ''}}`
+  const flag = !!dynamicAttrs.length
+  let content = `{${attrsStr.slice(1, -1)}${keyStr !== null ? `${eventRefKey ? ',' : ''}key:${keyStr}` : ''}}`
+  if (!content.slice(1, -1)) {
+    content = null
+  }
+  if (!flag && content) {
+    variableName.push(`_static_resources_${variableName.length + 1}`)
+    const currentVariableName = variableName.at(-1)
+    content = `(${currentVariableName} || (${currentVariableName} = ${content}))`
+  }
+  return [content, flag]
 }
 
 function patchVnodeElementStr(node, level, i, st, variableName) {
@@ -284,20 +308,22 @@ function patchVnodeElementStr(node, level, i, st, variableName) {
   if (node.condition && node.condition.length) {
     const condition = node.condition
     if (condition.at(-1).conditionValue.nodeName !== ATTRIFREF[1]) {
-      condition.push(createCommentNode(' if '))
+      condition.push(createCommentNode('if'))
     }
     let conditionStr = ""
     let index = 0
     while (index < condition.length - 1) {
       const it = condition[index]
-      conditionStr += `${conditionStr ? " : " : ''}(${it.conditionValue.nodeValue}) ? (${`h(\`${it.tag}\`,${patchNodeAttrs(it)}, ${transformParseVnode(it.children, selfLevel, st + 1, variableName)})`})`
+      const [attrStr] = patchNodeAttrs(it, variableName)
+      conditionStr += `${conditionStr ? " : " : ''}(${it.conditionValue.nodeValue}) ? (${`h(\`${it.tag}\`,${attrStr}, ${transformParseVnode(it.children, selfLevel, st + 1, variableName)})`})`
       index++
     }
     const lastIt = condition[condition.length - 1]
     conditionStr += `:${patchVnodeComment(lastIt, variableName).slice(0, -1)}`
     str += `(${conditionStr}),`
   } else {
-    str += `h(\`${node.tag}\`,${patchNodeAttrs(node)}, ${transformParseVnode(node.children, selfLevel, st + 1, variableName)}),`;
+    const [attrStr] = patchNodeAttrs(node, variableName)
+    str += `h(\`${node.tag}\`,${attrStr}, ${transformParseVnode(node.children, selfLevel, st + 1, variableName)}),`;
   }
   return str
 }
@@ -305,7 +331,7 @@ function patchVnodeElementStr(node, level, i, st, variableName) {
 function patchVnodeComment(node, variableName) {
   variableName.push(`commentNodeInfo${variableName.length + 1}`)
   const currentVariableName = variableName.at(-1)
-  return `(${currentVariableName} || (${currentVariableName} = h(\`${node.nodeValue}\`,{shapeFlag:${COMMENT_NODE}}))),`;
+  return `(${currentVariableName} || (${currentVariableName} = h(\`${node.nodeValue}\`,node_comment_type))),`;
 }
 
 function transformParseVnode(vnode, level, st = 1, variableName = []) {
@@ -327,7 +353,7 @@ function transformParseVnode(vnode, level, st = 1, variableName = []) {
           if (!flag) {
             variableName.push(`textNodeInfo${variableName.length + 1}`)
           }
-          hs += "(" + ((flag ? '' : `${variableName.at(-1)} || (${variableName.at(-1)} = `) + `h(${contentValue}, { shapeFlag: ${TEXT_NODE}})${flag ? "" : ")"}),`);
+          hs += "(" + ((flag ? '' : `${variableName.at(-1)} || (${variableName.at(-1)} = `) + `h(${contentValue}, node_text_type)${flag ? "" : ")"}),`);
         }
         break;
       case NODE.COMMENT_NODE:
@@ -362,6 +388,12 @@ function transfrom$$(template) {
       var fnMpsOne = []
       var { h,patchEventMemory } = hooks
       var vn = null;
+      var node_comment_type = {
+        shapeFlag:${COMMENT_NODE}
+      }
+      var node_text_type = {
+        shapeFlag:${TEXT_NODE}
+      }
       ${patchVariableName(variableName)}
       return function(){
         with(this){
