@@ -767,6 +767,10 @@
   const VNODE_CREATE_CHILDREN = 0b00001;
   const VNODE_AUTO_ADDEVENT = 0b00010;
 
+  function isFragment(target) {
+    return getNodeRefType(target) === FRAGMENT
+  }
+
   function vnodeSpecialLabelRun(n) {
     if (n.tag === "script") {
       const textContent = new VNode(n.content);
@@ -790,6 +794,9 @@
           });
         })
       );
+      if (isFragment(this)) {
+        return
+      }
       this.el = createRNode(this);
       setNodeAttrs(this.el, this.attrs);
       if (isCurrentScopeExist(VNODE_OPERATE_PERM, VNODE_CREATE_CHILDREN)) {
@@ -805,10 +812,14 @@
       }
     }
     append(parentNode) {
-      parentNode && parentNode.appendChild(this.el);
+      if (isFragment(this)) {
+        this.el = parentNode
+      } else {
+        parentNode && parentNode.appendChild(this.el);
+      }
     }
     remove() {
-      if (!this.el) return;
+      if (!this.el || isFragment(this)) return;
       this.el.remove();
     }
   }

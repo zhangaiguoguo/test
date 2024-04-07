@@ -29,73 +29,79 @@
 <script type="module">
   import "./vnodeDiff.js";
   import { createApp, getCurrentInstance, h } from "./transformVnode/index.js";
-
-  console.log(h('div', null, h(null, { shapeFlag: 1 }, [h('div', 1), h('div', 2)])));
-
+  const n1 = h('div', { num: 1 }, h(null, { shapeFlag: 1 }, [h('div', 1), h('div', 2)]))
+  const n2 = h('div', null, [h(null, { shapeFlag: 1 }, [h('div', 1), h('div', 2), h('div', 3)]), '你好', h(null, { shapeFlag: 1 }, [h('div', 1), h('div', 2), h('div', 3)])])
+  const render2 = vnodeHooks.rendering(document.querySelector("#root"), n2)
+  $('.switch').click(() => {
+    console.log(render2(n1));
+  })
+  $('.switch2').click(() => {
+    console.log(render2(n2));
+  })
   const data = {
     num: 1,
     name: "张三",
     done: true,
   };
 
-  const ctx = createApp({
-    template: `
-      ${new Array(2).fill(1).map(() => {
-      return `<div :class="num % 2 ?'root':'root-2'">
-            <div>div4</div>
-            <button :key="1" @click="fn" :num="num">点击++{{ num }}</button>
-            <button :key="1" @click="num--" :num="num">点击--{{ num }}</button>
-            <div if="num<10">div1</div>
-            <div :num="num" else-if="num<20">
-              div2
-              <h1 if="num>15">{{num > 15}}</h1>  
-            </div>
-            <div else-if="num<30">div3</div>
-            <button a>
-              <span>
-                <i>点击次数{{numCom}}</i>
-              </span>
-            </button>
-            <div>
-              <h1>我是{{ name }}今年{{num}}岁了</h1>  
-            </div>
-            <div>div3 {{this.done}}</div>
-            <input type="checkbox" @change=done=!done :checked="done"/>
-            <button @click="done = !done">切换</button>
-        </div>`})}
-    `,
-    data() {
-      return data;
-    },
-    methods: {
-      fn() {
-        this.num++;
-      },
-      fun() {
-        console.log(arguments);
-      },
-    },
-    watch: {
-      "this.done": {
-        handler() {
-          this.fn();
-        },
-      },
-    },
-    computed: {
-      numCom: {
-        get() {
-          return " num：" + this.num;
-        },
-        set(v) {
-          this.num = v;
-        },
-      },
-    },
-  }).mount("#app");
+  //   const ctx = createApp({
+  //     template: `
+  //       ${new Array(2).fill(1).map(() => {
+  //       return `<div :class="num % 2 ?'root':'root-2'">
+  //             <div>div4</div>
+  //             <button :key="1" @click="fn" :num="num">点击++{{ num }}</button>
+  //             <button :key="1" @click="num--" :num="num">点击--{{ num }}</button>
+  //             <div if="num<10">div1</div>
+  //             <div :num="num" else-if="num<20">
+  //               div2
+  //               <h1 if="num>15">{{num > 15}}</h1>
+  //             </div>
+  //             <div else-if="num<30">div3</div>
+  //             <button a>
+  //               <span>
+  //                 <i>点击次数{{numCom}}</i>
+  //               </span>
+  //             </button>
+  //             <div>
+  //               <h1>我是{{ name }}今年{{num}}岁了</h1>
+  //             </div>
+  //             <div>div3 {{this.done}}</div>
+  //             <input type="checkbox" @change=done=!done :checked="done"/>
+  //             <button @click="done = !done">切换</button>
+  //         </div>`})}
+  //     `,
+  //     data() {
+  //       return data;
+  //     },
+  //     methods: {
+  //       fn() {
+  //         this.num++;
+  //       },
+  //       fun() {
+  //         console.log(arguments);
+  //       },
+  //     },
+  //     watch: {
+  //       "this.done": {
+  //         handler() {
+  //           this.fn();
+  //         },
+  //       },
+  //     },
+  //     computed: {
+  //       numCom: {
+  //         get() {
+  //           return " num：" + this.num;
+  //         },
+  //         set(v) {
+  //           this.num = v;
+  //         },
+  //       },
+  //     },
+  //   }).mount("#app");
 
-  console.log(ctx);
-</script>
+  //   console.log(ctx);
+  // </script>
 
 <script>
   // console.log(hooks);
