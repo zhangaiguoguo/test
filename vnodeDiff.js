@@ -287,7 +287,7 @@
   const ELEMENTREF3 = "elementType";
 
   function getNodeRefType(node) {
-    return node[ELEMENTREF3];
+    return node && node[ELEMENTREF3];
   }
 
   function setNodeValue(node, value) {
@@ -360,6 +360,10 @@
 
   function isCurrentScopeExist(cexits, current) {
     return (cexits & current) === current;
+  }
+
+  function isDiffFragmentFlag(n1, n2) {
+    return ((isFragment(n1) && !isFragment(n2)) || (!isFragment(n1) && isFragment(n2)))
   }
 
   class DirrStore {
@@ -483,6 +487,7 @@
           continue;
         }
         if (
+          isDiffFragmentFlag(un.n1, dn) ||
           KEY_PERM_FLAG ||
           this.didUseState2.some(
             (ii) => ii.n1 === dn && ii.n2 === un && ii.count === un.count
@@ -537,8 +542,10 @@
       let index = null;
       for (let i = this.useState.length - 1; i >= 0; i--) {
         const cn = this.useState[i];
+        if (cn === n) continue
         if (
           !cn.n2 ||
+          isDiffFragmentFlag(cn.n2, n.n1) ||
           cn === n ||
           this.diff4StatusSome(cn, n) ||
           getNodeRefType(cn.n2) !== getNodeRefType(n.n1)
@@ -562,11 +569,12 @@
         }
         const count = this.diff(cn.n2, n.n1);
         if (
-          index
+          count > n.count &&
+          (index
             ? index[1] < count
             : true &&
             (count > cn.count ||
-              (count === cn.count && cn.n2.tag === n.n1.tag))
+              (count === cn.count && cn.n2.tag === n.n1.tag)))
         ) {
           if (usens.some((nn) => nn === cn)) continue;
           index = [i, count];
@@ -602,6 +610,9 @@
           flag = true;
           continue;
         }
+        if (isDiffFragmentFlag(cn.n1, n)) {
+          continue
+        }
         if (this.diff3StatusSome(cn, n)) continue;
         const KEY_PERM = this.diffKey(cn.n1, cn.n2);
         if (
@@ -635,7 +646,7 @@
         if (cn2) {
           this.didUseState.push(cn2);
         }
-      } else if (!flag) {
+      } else if (!flag && n) {
         this.didUseState.push(n);
       }
     }
@@ -819,7 +830,15 @@
       }
     }
     remove() {
-      if (!this.el || isFragment(this)) return;
+      if (isFragment(this)) {
+        if (this.children) {
+          for (let chil of this.children) {
+            chil.remove()
+          }
+        }
+        return
+      }
+      if (!this.el) return;
       this.el.remove();
     }
   }
@@ -830,18 +849,22 @@
     return n1 !== n2 && n1[KEY] === null && n1[KEY] === null;
   }
 
-  function vNodeCompareDiffRun(vnode, rnode, parent, diffManager) {
-    if (!vnode) return rnode;
-    if (!rnode.length && vnode.length) {
+  let patchVnodeLastNode = null
+
+  function vNodeCompareDiffRun(vnode, rnode, parent, diffManager, fragmentLastEl) {
+    if ((!rnode || !rnode.length) && vnode && vnode.length) {
       for (let i = 0; i < vnode.length; i++) {
         if (vnode[i] === null) continue;
         const node = new VNode(
           vnode[i],
           VNODE_OPERATE_PERM | VNODE_AUTO_ADDEVENT
         );
-        if (parent) {
-          node.append(parent);
-        }
+        if (fragmentLastEl) {
+          insertBefore(node, fragmentLastEl)
+        } else
+          if (parent) {
+            node.append(parent);
+          }
         rnode.splice(i, 1, node);
         if (
           !isSpecialLabel(node.tag) &&
@@ -853,13 +876,13 @@
           vNodeCompareDiffRun(children, node.children, node.el, diffManager);
         }
       }
-    } else if (!vnode.length && rnode.length) {
+    } else if ((!vnode || !vnode.length) && rnode.length) {
       for (let i = 0; i < rnode.length; i++) {
         rnode[i].remove();
         rnode.splice(i, 1);
         i--;
       }
-    } else {
+    } else if (vnode && rnode) {
       const diffStore = new DirrStore();
       let index = 0;
       if (rnode.length > vnode.length) {
@@ -868,9 +891,28 @@
       let keyStartIndex = 0;
       const useNodeKeys = [];
       const dUseNodeKeys = [];
+
       for (index; index < vnode.length; index++) {
         let n1 = vnode[index];
         let n2 = rnode[index];
+
+        if (isFragment(n1)) {
+          if (!isFragment(n2)) {
+            diffStore.diff3(n2)
+            n2 = null
+          }
+          const count = diffStore.diff(n1, n2)
+
+          diffStore.push2(n1, n2, count);
+
+          if (n2) {
+            diffStore.diff4(diffStore.useState.at(-1))
+          }
+          continue
+        } else if (isFragment(n2)) {
+          diffStore.diff3(n2)
+          n2 = null
+        }
         if (
           n2 &&
           ((n1[KEY] === null && n2[KEY] !== null) ||
@@ -925,24 +967,36 @@
         let count = 0;
         if (n2 && n2 === rnode[index]) {
           if (notKeySame(n1, n2)) {
+
             count = diffStore.diff(n1, n2);
           } else {
+
             count = diffStore.diff(n1, n2, 0b001010);
           }
         }
+
         diffStore.push2(n1, n2, count);
+
         var ncn = diffStore.useState.at(-1);
+
         diffStore.diff2(ncn);
+
         if (!ncn.n2 && !n2) {
+
           diffStore.diff4(ncn);
         }
       }
-      runDiffStore(diffStore, vnode, rnode, parent, diffManager);
+
+      console.log(diffStore, vnode, rnode);
+      debugger
+
+      runDiffStore(diffStore, vnode, rnode, parent, diffManager, fragmentLastEl);
     }
     return rnode;
   }
 
-  function runDiffStore(diffStore, n1, n2, parent, diffManager) {
+  function runDiffStore(diffStore, n1, n2, parent, diffManager, fragmentLastEl) {
+    patchVnodeLastNode = null
     const didUseState = diffStore.didUseState;
     for (let i = 0; i < didUseState.length; i++) {
       if (didUseState[i] && didUseState[i].el) {
@@ -954,63 +1008,109 @@
       }
     }
     const useState = diffStore.useState;
-    const nodes = [];
+    const nodes = fragmentLastEl ? [fragmentLastEl] : [];
     for (let ni = useState.length - 1; ni >= 0; ni--) {
       const nin = useState[ni];
-      let cn = nin.n2;
-      let nn1 = nin.n1;
-      let cnIsNewAddFlag = false;
-      var CURRENT_NODE_PERM = null;
-      let diffNodeType = null;
+      let cn = nin.n2, nn1 = nin.n1, cnIsNewAddFlag = false, CURRENT_NODE_PERM = null, diffNodeType = null;
+
       if (diffNodeType = (getNodeRefType(nn1) === ELEMENTREF2)) {
+
         const sub = diffStore.find(nn1, cn);
+
         if (sub) {
+
           CURRENT_NODE_PERM = sub.CURRENT_NODE_PERM;
         }
       }
+
       {
-        var nn2 = n2[ni];
-        var last = nodes[0];
+
+        let nn2 = n2[ni], last = getLastNode(nodes);
+        patchVnodeLastNode = last
         if (cn && nn1.tag === "script" && nn1.content !== cn.content) {
+
           cn.remove();
+
           cn = null;
         }
         if (cn) {
+
           var ocn = null;
+
           if (nn1.tag !== cn.tag) {
-            var cnc = cn.children;
+
+            let cnc = cn.children;
+
             ocn = cn;
+
             cn = new VNode(nn1, VNODE_OPERATE_PERM);
+
             cn.children = cnc;
+
             cnIsNewAddFlag = true;
           }
           if (nn2 !== cn) {
+
             if (last) {
+
               insertBefore(cn, last);
             } else if (nn2) {
+
               insertBefore(cn, nn2);
             } else if (!nn2) {
+
               if (parent.lastElementChild !== cn.el) cn.append(parent);
             }
           } else {
-            if (!cn.el.parentNode || !cn.el.parentNode.parentNode) {
-              if (last) {
-                insertBefore(cn, last);
-              } else {
-                cn.append(parent);
+            if (isFragment(nn1)) {
+              console.log(nn1.children, cn.children, parent, diffManager, last);
+              vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, last)
+
+            } else {
+
+              if (!cn.el.parentNode || !cn.el.parentNode.parentNode) {
+
+                if (last) {
+
+                  insertBefore(cn, last);
+                } else {
+
+                  cn.append(parent);
+                }
               }
             }
           }
           if (ocn) {
+
             removeNode(ocn);
           }
         } else {
-          cn = new VNode(nn1, VNODE_OPERATE_PERM);
+
+          cn = new VNode(nn1, VNODE_OPERATE_PERM | VNODE_AUTO_ADDEVENT);
+
           cnIsNewAddFlag = true;
-          if (last) {
-            insertBefore(cn, last);
+
+          if (isFragment(nn1)) {
+
+            cn.append(parent)
+
+            cn.children = vNodeCompareDiffRun(
+              nn1.children,
+              [],
+              parent,
+              diffManager,
+              last
+            );
+
           } else {
-            cn.append(parent);
+
+            if (last) {
+
+              insertBefore(cn, last);
+            } else {
+
+              cn.append(parent);
+            }
           }
         }
         var nodeType = getNodeRefType(cn);
@@ -1019,19 +1119,23 @@
           nodeType === COMMENTREF2 ||
           isSpecialLabel(cn.tag)
         ) {
+
           if (cn.content !== nn1.content) {
             if (cn.tag === "script") {
+
             } else {
+
               cn.el.textContent = nn1.content;
             }
             cn.content = nn1.content;
           }
-        } else {
-          let newChildren = cn.children || [];
-          let vnChildren = nn1.children;
+        } else if (!isFragment(nn1)) {
+          let newChildren = (cn.children || []), vnChildren = nn1.children;
           if (typeof vnChildren === "string") {
+
             vnChildren = [createVnodeText(vnChildren)];
           }
+
           diffManager.push({
             run: () => {
               cn.children = vNodeCompareDiffRun(
@@ -1042,13 +1146,16 @@
               );
             },
           });
+
           diffManager.runTask();
         }
       }
       if (diffNodeType) {
+
         if (cnIsNewAddFlag) {
           cn.evts = {};
         }
+
         setNodeEvts(cn.el, nn1, cn);
       }
       if (!ocn) {
@@ -1060,9 +1167,26 @@
       cn.key = nn1.key;
       nodes.unshift(cn);
     }
-    n2.splice(0, n2.length, ...nodes);
+    n2.splice(0, n2.length, ...nodes.filter((cn) => cn !== fragmentLastEl));
     nodes.splice(0, nodes.length);
     diffStore.clear();
+  }
+
+  function getLastNode(nodes) {
+    for (let i = 0; i < nodes.length; i++) {
+      let cnode = nodes[i]
+      if (isFragment(cnode)) {
+        if (cnode.children && cnode.children.length) {
+          const result = getLastNode(cnode.children)
+          if (result) {
+            return result
+          }
+        }
+      } else {
+        return cnode
+      }
+    }
+    return null
   }
 
   function setNodeEvts(el, n1, n2) {
@@ -1178,6 +1302,12 @@
 
   function removeNode(node) {
     if (node) {
+      if (isFragment(node)) {
+        for (let w of node.children) {
+          w.remove()
+        }
+        return
+      }
       const el = node.el instanceof Node ? node.el : node;
       el.remove();
     }
