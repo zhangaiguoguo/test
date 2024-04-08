@@ -422,27 +422,27 @@
       if ((perm & DIFFNODETAG) === DIFFNODETAG && n1.tag === n2.tag) {
         count += DIFFNODETAG;
       }
-      if ((perm & DIFFNODEATTRS) === DIFFNODEATTRS && n2.attrs && n1.attrs) {
+      if ((perm & DIFFNODEATTRS) === DIFFNODEATTRS) {
         const ks = [];
-        for (let k in n1.attrs) {
-          if (k in n2.attrs) {
-            count++;
+        if (n1.attrs && n2.attrs) {
+          for (let k in n1.attrs) {
+            if (k in n2.attrs) {
+              count++;
+            }
+            if (n1.attrs[k] === n2.attrs[k]) {
+              count++;
+            } else {
+              CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_SET;
+            }
+            ks.push(k);
           }
-          if (n1.attrs[k] === n2.attrs[k]) {
+        }
+        if (
+          (perm & DIFFNODEATTRLENGTH) === DIFFNODEATTRLENGTH) {
+          const ks2 = n2.attrs && keys(n2.attrs);
+          if (ks.length === (ks2 && ks2.length)) {
             count++;
           } else {
-            CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_SET;
-          }
-          ks.push(k);
-        }
-        const ks2 = keys(n2.attrs);
-        if (
-          (perm & DIFFNODEATTRLENGTH) === DIFFNODEATTRLENGTH &&
-          ks.length === ks2.length
-        ) {
-          count++;
-        } else {
-          if (ks.length !== ks2.length) {
             CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_LENGTH;
           }
         }
@@ -1257,9 +1257,8 @@
     let attrs = n1.attrs,
       attrs2 = n2.attrs;
     var el = n1.el || n2.el;
-    var NODE_ATTR_LENGTH2 =
-      attrs2 && (CURRENT_NODE_PERM & NODE_ATTR_LENGTH) === NODE_ATTR_LENGTH;
-    var attrs2Ks = keys(attrs2);
+    var NODE_ATTR_LENGTH2 = (CURRENT_NODE_PERM & NODE_ATTR_LENGTH) === NODE_ATTR_LENGTH;
+    var attrs2Ks = attrs2 && keys(attrs2);
     if (attrs) {
       if (
         (CURRENT_NODE_PERM & NODE_ATTR_SET) === NODE_ATTR_SET ||
@@ -1267,6 +1266,7 @@
       ) {
         for (var k in attrs) {
           if (!attrs2 || attrs2[k] !== attrs[k]) {
+            n2.attrs = (attrs2 = {})
             attrs2[k] = attrs[k];
             patchSpecialNodeAttr(el, k, attrs2[k]);
             el.setAttribute(k, attrs2[k]);
