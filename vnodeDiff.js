@@ -826,7 +826,9 @@
       if (isFragment(this)) {
         this.el = parentNode
       } else {
-        parentNode && parentNode.appendChild(this.el);
+        if (parentNode.lastElementChild !== this.el) {
+          parentNode && parentNode.appendChild(this.el);
+        }
       }
     }
     remove() {
@@ -987,8 +989,8 @@
         }
       }
 
-      console.log(diffStore, vnode, rnode);
-      debugger
+      // console.log(diffStore, vnode, rnode);
+      // debugger
 
       runDiffStore(diffStore, vnode, rnode, parent, diffManager, fragmentLastEl);
     }
@@ -1052,24 +1054,32 @@
           if (nn2 !== cn) {
 
             if (last) {
-
-              insertBefore(cn, last);
+              if (isFragment(cn)) {
+                vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, last)
+              } else {
+                insertBefore(cn, last);
+              }
             } else if (nn2) {
-
-              insertBefore(cn, nn2);
-            } else if (!nn2) {
+              let curIndex = ni, curNode = nn2
+              while (curIndex < n2.length) {
+                if (isFragment(n2[curIndex]) && n2[curIndex].children.length) {
+                  curNode = n2[curIndex].children.at(-1)
+                  break
+                } else {
+                  curNode = n2[curIndex]
+                }
+                curIndex++
+              }
+              insertAfter(curNode, cn);
+            } else {
 
               if (parent.lastElementChild !== cn.el) cn.append(parent);
             }
           } else {
             if (isFragment(nn1)) {
-              console.log(nn1.children, cn.children, parent, diffManager, last);
               vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, last)
-
             } else {
-
               if (!cn.el.parentNode || !cn.el.parentNode.parentNode) {
-
                 if (last) {
 
                   insertBefore(cn, last);
@@ -1101,6 +1111,7 @@
               diffManager,
               last
             );
+
 
           } else {
 
@@ -1289,7 +1300,16 @@
     }
   }
 
+  function insertAfter(n1, n2) {
+    if (n1.el.nextElementSibling !== n2.el) {
+      n1.el.after(n2.el)
+    }
+  }
+
   function insertBefore(n1, n2) {
+    if (n1.el.nextElementSibling === n2.el) {
+      return
+    }
     if (n1 && n2 && n2.el.previousElementSibling !== n1.el) {
       const parentNode = n2.el.parentNode;
       parentNode.insertBefore(n1.el, n2.el);
