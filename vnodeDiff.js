@@ -573,8 +573,8 @@
           (index
             ? index[1] < count
             : true &&
-            (count > cn.count ||
-              (count === cn.count && cn.n2.tag === n.n1.tag)))
+            ((count > cn.count && count > n.count) ||
+              (count === cn.count && cn.n2.tag !== cn.n1.tag)))
         ) {
           if (usens.some((nn) => nn === cn)) continue;
           index = [i, count];
@@ -612,23 +612,24 @@
         }
         if (isDiffFragmentFlag(cn.n1, n)) {
           continue
+        } else {
+          const KEY_PERM = this.diffKey(cn.n1, cn.n2);
+          if (
+            getNodeRefType(cn.n1) !== getNodeRefType(n) ||
+            isCurrentScopeExist(KEY_PERM, KEY_PERM_N_PERM) ||
+            (n[KEY] !== null && cn.n1[KEY] === null) ||
+            (cn.n1[KEY] !== null && n[KEY] === null)
+          )
+            continue;
         }
         if (this.diff3StatusSome(cn, n)) continue;
-        const KEY_PERM = this.diffKey(cn.n1, cn.n2);
-        if (
-          getNodeRefType(cn.n1) !== getNodeRefType(n) ||
-          isCurrentScopeExist(KEY_PERM, KEY_PERM_N_PERM) ||
-          (n[KEY] !== null && cn.n1[KEY] === null) ||
-          (cn.n1[KEY] !== null && n[KEY] === null)
-        )
-          continue;
         if (n[KEY] !== null && cn.n1[KEY] !== null && cn.n1[KEY] !== n[KEY]) {
           continue;
         }
         const count = this.diff(cn.n1, n);
         if (
           (index ? index[1] < count : true) &&
-          (count > cn.count || (count === cn.count && cn.n1.tag === n.tag))
+          (count > cn.count || (count === cn.count && cn.n1.tag !== cn.n2.tag))
         ) {
           if (usens.some((nn) => nn === cn)) continue;
           index = [i, count];
@@ -899,17 +900,17 @@
         let n2 = rnode[index];
 
         if (isFragment(n1)) {
+          let count = 0
           if (!isFragment(n2)) {
             diffStore.diff3(n2)
             n2 = null
+          } else {
+            count = diffStore.diff(n1, n2)
           }
-          const count = diffStore.diff(n1, n2)
 
           diffStore.push2(n1, n2, count);
 
-          if (n2) {
-            diffStore.diff4(diffStore.useState.at(-1))
-          }
+          diffStore.diff4(diffStore.useState.at(-1))
           continue
         } else if (isFragment(n2)) {
           diffStore.diff3(n2)
@@ -1060,6 +1061,7 @@
                 insertBefore(cn, last);
               }
             } else if (nn2) {
+
               let curIndex = ni, curNode = nn2
               while (curIndex < n2.length) {
                 if (isFragment(n2[curIndex]) && n2[curIndex].children.length) {
@@ -1070,7 +1072,13 @@
                 }
                 curIndex++
               }
-              insertAfter(curNode, cn);
+              if (isFragment(cn)) {
+
+                vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, curNode)
+              } else {
+
+                insertAfter(curNode, cn);
+              }
             } else {
 
               if (parent.lastElementChild !== cn.el) cn.append(parent);
