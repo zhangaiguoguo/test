@@ -498,7 +498,7 @@
             un.n1[KEY] !== dn[KEY])
         )
           continue;
-        const cCount = this._diff(un.n1, dn, un.count);
+        const cCount = this._diff(un, dn, un.count);
         if (cCount !== false) {
           const n2 = un.n2;
           if (n2) {
@@ -518,9 +518,9 @@
         }
       }
     }
-    _diff(n1, n2, _count = 0) {
-      const count = this.diff(n1, n2);
-      if (count > _count || (count === _count && n1.tag === n2.tag)) {
+    _diff(cn, n2) {
+      const count = this.diff(cn.n1, n2);
+      if ((count > cn.count) || (count === cn.count && cn.n1.tag !== cn.n2.tag)) {
         return count;
       }
       return false;
@@ -827,7 +827,7 @@
       if (isFragment(this)) {
         this.el = parentNode
       } else {
-        if (parentNode.lastElementChild !== this.el) {
+        if (parentNode.lastChild !== this.el) {
           parentNode && parentNode.appendChild(this.el);
         }
       }
@@ -862,12 +862,14 @@
           vnode[i],
           VNODE_OPERATE_PERM | VNODE_AUTO_ADDEVENT
         );
-        if (fragmentLastEl) {
+
+        if (fragmentLastEl && !isFragment(node)) {
           insertBefore(node, fragmentLastEl)
         } else
           if (parent) {
             node.append(parent);
           }
+        if (!rnode) rnode = []
         rnode.splice(i, 1, node);
         if (
           !isSpecialLabel(node.tag) &&
@@ -876,10 +878,10 @@
         ) {
           node.children = [];
           const children = transFormArray(vnode[i].children);
-          vNodeCompareDiffRun(children, node.children, node.el, diffManager);
+          vNodeCompareDiffRun(children, node.children, node.el, diffManager, fragmentLastEl);
         }
       }
-    } else if ((!vnode || !vnode.length) && rnode.length) {
+    } else if ((!vnode || !vnode.length) && rnode && rnode.length) {
       for (let i = 0; i < rnode.length; i++) {
         rnode[i].remove();
         rnode.splice(i, 1);
@@ -888,9 +890,6 @@
     } else if (vnode && rnode) {
       const diffStore = new DirrStore();
       let index = 0;
-      if (rnode.length > vnode.length) {
-        diffStore.push(rnode.slice(vnode.length).filter(Boolean));
-      }
       let keyStartIndex = 0;
       const useNodeKeys = [];
       const dUseNodeKeys = [];
@@ -990,6 +989,12 @@
         }
       }
 
+      const unmatchedNodes = rnode.slice(vnode.length).filter(Boolean)
+
+      unmatchedNodes.forEach((node) => {
+        diffStore.diff3(node)
+      })
+
       // console.log(diffStore, vnode, rnode);
       // debugger
 
@@ -1003,6 +1008,7 @@
     const didUseState = diffStore.didUseState;
     for (let i = 0; i < didUseState.length; i++) {
       if (didUseState[i] && didUseState[i].el) {
+        console.log(didUseState[i]);
         removeNode(didUseState[i]);
         n2.splice(
           n2.findIndex((nn) => nn === didUseState[i]),
@@ -1053,10 +1059,9 @@
             cnIsNewAddFlag = true;
           }
           if (nn2 !== cn) {
-
             if (last) {
               if (isFragment(cn)) {
-                vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, last)
+                cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, last)
               } else {
                 insertBefore(cn, last);
               }
@@ -1080,8 +1085,7 @@
                 insertAfter(curNode, cn);
               }
             } else {
-
-              if (parent.lastElementChild !== cn.el) cn.append(parent);
+              cn.append(parent);
             }
           } else {
             if (isFragment(nn1)) {
@@ -1309,16 +1313,16 @@
   }
 
   function insertAfter(n1, n2) {
-    if (n1.el.nextElementSibling !== n2.el) {
+    if (n1.el.nextSibling !== n2.el) {
       n1.el.after(n2.el)
     }
   }
 
   function insertBefore(n1, n2) {
-    if (n1.el.nextElementSibling === n2.el) {
+    if (n1.el.nextSibling === n2.el) {
       return
     }
-    if (n1 && n2 && n2.el.previousElementSibling !== n1.el) {
+    if (n1 && n2 && n2.el.previousSibling !== n1.el) {
       const parentNode = n2.el.parentNode;
       parentNode.insertBefore(n1.el, n2.el);
     }
@@ -1331,8 +1335,10 @@
   function removeNode(node) {
     if (node) {
       if (isFragment(node)) {
-        for (let w of node.children) {
-          w.remove()
+        if (node.children) {
+          for (let w of node.children) {
+            w.remove()
+          }
         }
         return
       }
