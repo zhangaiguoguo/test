@@ -988,13 +988,9 @@
           diffStore.diff4(ncn);
         }
       }
-
-      const unmatchedNodes = rnode.slice(vnode.length).filter(Boolean)
-
-      unmatchedNodes.forEach((node) => {
-        diffStore.diff3(node)
-      })
-
+      for (index; index < rnode.length; index++) {
+        diffStore.diff3(rnode[index])
+      }
       // console.log(diffStore, vnode, rnode);
       // debugger
 
@@ -1008,7 +1004,6 @@
     const didUseState = diffStore.didUseState;
     for (let i = 0; i < didUseState.length; i++) {
       if (didUseState[i] && didUseState[i].el) {
-        console.log(didUseState[i]);
         removeNode(didUseState[i]);
         n2.splice(
           n2.findIndex((nn) => nn === didUseState[i]),
