@@ -89,3 +89,47 @@ function getSequence(arr) {
 }
 
 // console.log(getSequence([1, 3, 2, 2, 4, 5, 6, 7, 8, 2]));
+
+
+
+export function sort(arr) {
+  if (arr.length === 1) {
+    return arr;
+  }
+  let minIndex = null;
+  for (let i = 0; i < arr.length; i++) {
+    if (i) {
+      if (arr[i - 1] > arr[i]) {
+        let index =
+          minIndex !== null && arr[minIndex] >= arr[i] ? minIndex : i - 1;
+        while (
+          index >=
+          (minIndex !== null && arr[minIndex] <= arr[i] ? minIndex : 0)
+        ) {
+          if (arr[index] <= arr[i]) {
+            minIndex = index;
+            const cv = arr[i];
+            arr.splice(i, 1);
+            arr.splice(index + 1, 0, cv);
+            break;
+          }
+          index--;
+        }
+        if (index === -1) {
+          const cv = arr[i];
+          arr.splice(i, 1);
+          arr.splice(0, 0, cv);
+          minIndex = 0
+        }
+        continue;
+      }
+    }
+  }
+  return arr;
+}
+// console.log(
+//   sort([
+//     100, 68, 50, 54, 1, 3, 4, 2, 1, 43, 100, 3, 4, 2, 1, 23, 4, 4, 5, 6, 78,
+//     8,
+//   ])
+// );

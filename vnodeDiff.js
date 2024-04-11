@@ -543,6 +543,7 @@
       for (let i = this.useState.length - 1; i >= 0; i--) {
         const cn = this.useState[i];
         if (cn === n) continue
+        const isFragmentFlag = isFragment(n.n1)
         if (
           !cn.n2 ||
           isDiffFragmentFlag(cn.n2, n.n1) ||
@@ -551,21 +552,23 @@
           getNodeRefType(cn.n2) !== getNodeRefType(n.n1)
         )
           continue;
-        const CN_KEY_PERM = this.diffKey(cn.n1, cn.n2);
-        if (
-          isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N_PERM) ||
-          (isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) &&
-            !isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N2_PERM)) ||
-          (isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N2_PERM) &&
-            !isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM))
-        )
-          continue;
-        if (
-          isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) &&
-          isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N2_PERM) &&
-          n.n1[KEY] !== cn.n2[KEY]
-        ) {
-          continue;
+        if (!isFragmentFlag) {
+          const CN_KEY_PERM = this.diffKey(cn.n1, cn.n2);
+          if (
+            isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N_PERM) ||
+            (isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) &&
+              !isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N2_PERM)) ||
+            (isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N2_PERM) &&
+              !isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM))
+          )
+            continue;
+          if (
+            isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) &&
+            isCurrentScopeExist(CN_KEY_PERM, KEY_PERM_N2_PERM) &&
+            n.n1[KEY] !== cn.n2[KEY]
+          ) {
+            continue;
+          }
         }
         const count = this.diff(cn.n2, n.n1);
         if (
@@ -1061,20 +1064,11 @@
                 insertBefore(cn, last);
               }
             } else if (nn2) {
+              const curNode = isFragment(nn2) ? getLastFragmentNode(n2, ni) : nn2
 
-              let curIndex = ni, curNode = nn2
-              while (curIndex < n2.length) {
-                if (isFragment(n2[curIndex]) && n2[curIndex].children.length) {
-                  curNode = n2[curIndex].children.at(-1)
-                  break
-                } else {
-                  curNode = n2[curIndex]
-                }
-                curIndex++
-              }
               if (isFragment(cn)) {
 
-                vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, curNode)
+                cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, curNode)
               } else {
 
                 insertAfter(curNode, cn);
@@ -1084,7 +1078,7 @@
             }
           } else {
             if (isFragment(nn1)) {
-              vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, last)
+              cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, last)
             } else {
               if (!cn.el.parentNode || !cn.el.parentNode.parentNode) {
                 if (last) {
@@ -1110,7 +1104,6 @@
           if (isFragment(nn1)) {
 
             cn.append(parent)
-
             cn.children = vNodeCompareDiffRun(
               nn1.children,
               [],
@@ -1239,6 +1232,25 @@
     }
     if (n2) {
       n2.evts = evts1;
+    }
+  }
+
+  function getLastFragmentNode(nodes, startIndex) {
+    if (!nodes) return
+    let index = arguments.length >= 2 ? startIndex : (nodes.length - 1 || 0);
+    while (index >= 0) {
+      const node = nodes[index]
+      if (node) {
+        if (isFragment(node)) {
+          const result = getLastFragmentNode(node.children)
+          if (result) {
+            return result
+          }
+        } else {
+          return node
+        }
+      }
+      index--
     }
   }
 
