@@ -1,4 +1,5 @@
 import { baseParse } from "../baseParse.js";
+import * as vnodeHooks from "../vnodeDiff/index.js";
 import {
   has,
   indexOf,
@@ -7,6 +8,7 @@ import {
   isObject,
   isString,
   keys,
+  patchForFill,
   transformArray,
 } from "./utils.js";
 var NODE =
@@ -39,13 +41,13 @@ function patchTextContent(nodeValue) {
     .filter(Boolean);
   var nContent = `[`;
   var flag = true;
-  var done = false
+  var done = false;
   for (let i = 0; i < content.length; i++) {
     const c = content[i];
     if (c !== startr && content[i - 1] === startr && content[i + 1] === endr) {
       nContent = nContent.slice(0, -5);
       nContent += `${c},`;
-      done = true
+      done = true;
       flag = false;
       continue;
     }
@@ -59,56 +61,60 @@ function patchTextContent(nodeValue) {
 }
 
 const extend = Object.assign;
-const eventMemoryState = {}
-let eventMemoryStateCount = 1
+const eventMemoryState = {};
+let eventMemoryStateCount = 1;
 
 function on(content) {
-  let key, currentEventState
+  let key, currentEventState;
   for (let ek in content) {
     if (!key) {
       key = "event-memory-key-" + eventMemoryStateCount;
-      currentEventState = (eventMemoryState[key] = {
+      currentEventState = eventMemoryState[key] = {
         ctx: null,
         setCtx(ctx) {
           if (this.ctx !== ctx) {
-            this.ctx = ctx
+            this.ctx = ctx;
           }
         },
-        events: {
-
-        }
-      });
-      eventMemoryStateCount++
+        events: {},
+      };
+      eventMemoryStateCount++;
     }
     currentEventState.events[ek] = function ($event) {
-      return new Function('ctx,$event', `
+      return new Function(
+        "ctx,$event",
+        `
         with(ctx){
           return ${content[ek]}
         }
-      `)(currentEventState.ctx, $event)
-    }
+      `
+      )(currentEventState.ctx, $event);
+    };
   }
   if (!key) {
-    return [null]
+    return [null];
   }
-  return [key, (ctx) => {
-    return patchEventMemory(key, ctx)
-  }]
+  return [
+    key,
+    (ctx) => {
+      return patchEventMemory(key, ctx);
+    },
+  ];
 }
 
 function patchEventMemory(key, ctx) {
-  const current = eventMemoryState[key]
-  if (!current) return {}
-  current.setCtx(ctx)
-  return current.events
+  const current = eventMemoryState[key];
+  if (!current) return {};
+  current.setCtx(ctx);
+  return current.events;
 }
 
-const patchvNodeHooks = extend({ patchEventMemory, h }, vnodeHooks);
+const patchvNodeHooks = extend({ patchEventMemory, h, patchForFill }, vnodeHooks);
 
 const COMPONENT_NODE = 0b001000;
 const ELEMENT_NODE = 0b000100;
 const TEXT_NODE = 0b000010;
-const FRAGMENT_node = 0b000001
+const FRAGMENT_NODE = 0b000001;
 const COMMENT_NODE = 0b001001;
 const IS_V_NODE_REF = "_is_v_node";
 const IS_V_NODE_COMPONENT_REF = "_is_v_component_node";
@@ -119,13 +125,13 @@ function parseHShapeFlag(type) {
     return COMPONENT_NODE;
   }
   if (/[a-z]+[0-9_-]*?/gi.test(type)) {
-    return ELEMENT_NODE
+    return ELEMENT_NODE;
   }
   return TEXT_NODE;
 }
 
 export function h(type, props, children = null) {
-  const l = arguments.length
+  const l = arguments.length;
   if (l === 2) {
     if (props && (!isObject(props) || props[IS_V_NODE_REF])) {
       children = props;
@@ -133,16 +139,23 @@ export function h(type, props, children = null) {
     }
   } else if (l === 1) {
     props = null;
-    children = null
+    children = null;
   }
-  if (children !== null && !isArray(children) && (l === 3 && isObject(children) ? has(children, IS_V_NODE_REF) : true)) {
-    children = transformArray(children)
+  if (
+    children !== null &&
+    !isArray(children) &&
+    (l === 3 && isObject(children) ? has(children, IS_V_NODE_REF) : true)
+  ) {
+    children = transformArray(children);
   }
   if (isArray(children)) {
     for (let i = 0; i < children.length; i++) {
       const node = children[i];
       if (!has(node, IS_V_NODE_REF)) {
-        children[i] = h(node, typeof node !== "object" ? { shapeFlag: TEXT_NODE } : null)
+        children[i] = h(
+          node,
+          typeof node !== "object" ? { shapeFlag: TEXT_NODE } : null
+        );
       }
     }
   }
@@ -167,9 +180,9 @@ export function h(type, props, children = null) {
     case COMMENT_NODE:
       node = patchvNodeHooks.createVnodeComment(type);
       break;
-    case FRAGMENT_node:
+    case FRAGMENT_NODE:
       node = patchvNodeHooks.createVnodeFragment(type, props, children);
-      break
+      break;
     default:
       node = {
         shapeFlag: COMMENT_NODE,
@@ -199,14 +212,14 @@ function sliceCurrent(str, start, end = str.length) {
   return str.slice(start, end);
 }
 
-const ATTRIFREF = ['else-if', 'else']
+const ATTRIFREF = ["else-if", "else"];
 
-const ATTRIFREF2 = ['if', ...ATTRIFREF]
+const ATTRIFREF2 = ["if", ...ATTRIFREF];
 
 function isAttrsExistTarget(attrs, value) {
   for (let w of attrs) {
     if (w.nodeName === value) {
-      return true
+      return true;
     }
   }
 }
@@ -247,16 +260,16 @@ function patchEventString(evts) {
 
 function patchParseDynamicAttrs(attrs, dynamicAttrs, argStr = "") {
   let str = "{";
-  let dyKeyStr = null
+  let dyKeyStr = null;
   for (let w in attrs) {
-    const flag = dynamicAttrs.indexOf(w) > -1
-    if (w === 'key') {
+    const flag = dynamicAttrs.indexOf(w) > -1;
+    if (w === "key") {
       if (flag) {
-        dyKeyStr = `${attrs[w]}`
+        dyKeyStr = `${attrs[w]}`;
       } else {
-        dyKeyStr = `\`${attrs[w]}\``
+        dyKeyStr = `\`${attrs[w]}\``;
       }
-      continue
+      continue;
     }
     if (flag) {
       str += `"${w}" : ${attrs[w]} ,`;
@@ -265,7 +278,7 @@ function patchParseDynamicAttrs(attrs, dynamicAttrs, argStr = "") {
     }
   }
 
-  str += (argStr + "}");
+  str += argStr + "}";
 
   return [str, dyKeyStr];
 }
@@ -273,8 +286,8 @@ function patchParseDynamicAttrs(attrs, dynamicAttrs, argStr = "") {
 function createCommentNode(v) {
   return {
     nodeValue: v,
-    type: NODE.COMMENT_NODE
-  }
+    type: NODE.COMMENT_NODE,
+  };
 }
 
 function patchNodeAttrs(node, variableName) {
@@ -283,54 +296,82 @@ function patchNodeAttrs(node, variableName) {
   if (eventRefKey) {
     variableName.push(`_static_resources_evts_${variableName.length + 1}`);
   }
-  let evtStr = eventRefKey ? (`...(${variableName.at(-1)} || (${variableName.at(-1)} = patchEventMemory("${eventRefKey}", this)))`) : ""
+  let evtStr = eventRefKey
+    ? `...(${variableName.at(-1)} || (${variableName.at(
+      -1
+    )} = patchEventMemory("${eventRefKey}", this)))`
+    : "";
   const [attrsStr, keyStr] = patchParseDynamicAttrs(
     attrs,
     dynamicAttrs,
     evtStr
   );
-  const flag = !!dynamicAttrs.length
-  let content = `{${attrsStr.slice(1, -1)}${keyStr !== null ? `${eventRefKey ? ',' : ''}key:${keyStr}` : ''}}`
+  const flag = !!dynamicAttrs.length;
+  let content = `{${attrsStr.slice(1, -1)}${keyStr !== null ? `${eventRefKey ? "," : ""}key:${keyStr}` : ""
+    }}`;
   if (!content.slice(1, -1)) {
-    content = null
+    content = null;
   }
   if (!flag && content) {
-    variableName.push(`_static_resources_${variableName.length + 1}`)
-    const currentVariableName = variableName.at(-1)
-    content = `(${currentVariableName} || (${currentVariableName} = ${content}))`
+    variableName.push(`_static_resources_${variableName.length + 1}`);
+    const currentVariableName = variableName.at(-1);
+    content = `(${currentVariableName} || (${currentVariableName} = ${content}))`;
   }
-  return [content, flag]
+  return [content, flag];
 }
 
 function patchVnodeElementStr(node, level, i, st, variableName) {
-  let str = '';
-  const selfLevel = [...level, i]
+  let str = "";
+  const selfLevel = [...level, i];
   if (node.condition && node.condition.length) {
-    const condition = node.condition
+    const condition = node.condition;
     if (condition.at(-1).conditionValue.nodeName !== ATTRIFREF[1]) {
-      condition.push(createCommentNode('if'))
+      condition.push(createCommentNode("if"));
     }
-    let conditionStr = ""
-    let index = 0
+    let conditionStr = "";
+    let index = 0;
     while (index < condition.length - 1) {
-      const it = condition[index]
-      const [attrStr] = patchNodeAttrs(it, variableName)
-      conditionStr += `${conditionStr ? " : " : ''}(${it.conditionValue.nodeValue}) ? (${`h(\`${it.tag}\`,${attrStr}, ${transformParseVnode(it.children, selfLevel, st + 1, variableName)})`})`
-      index++
+      const it = condition[index];
+      const [attrStr] = patchNodeAttrs(it, variableName);
+      conditionStr += `${conditionStr ? " : " : ""}(${it.conditionValue.nodeValue
+        }) ? (${`h(\`${it.tag}\`,${attrStr}, ${transformParseVnode(
+          it.children,
+          selfLevel,
+          st + 1,
+          variableName
+        )})`})`;
+      index++;
     }
-    const lastIt = condition[condition.length - 1]
-    conditionStr += `:${patchVnodeComment(lastIt, variableName).slice(0, -1)}`
-    str += `(${conditionStr}),`
+    const lastIt = condition[condition.length - 1];
+    conditionStr += `:${patchVnodeComment(lastIt, variableName).slice(0, -1)}`;
+    str += `(${conditionStr}),`;
+  } else if (node.forCtx) {
+    const forCtx = node.forCtx;
+    const [attrStr] = patchNodeAttrs(node, variableName);
+    str += `h(null,node_fragment_type,patchForFill(${forCtx.content}).map(${forCtx.variable
+      } => {
+    return h(\`${node.tag}\`,${attrStr}, ${transformParseVnode(
+        node.children,
+        selfLevel,
+        st + 1,
+        variableName
+      )}) 
+  })),`;
   } else {
-    const [attrStr] = patchNodeAttrs(node, variableName)
-    str += `h(\`${node.tag}\`,${attrStr}, ${transformParseVnode(node.children, selfLevel, st + 1, variableName)}),`;
+    const [attrStr] = patchNodeAttrs(node, variableName);
+    str += `h(\`${node.tag}\`,${attrStr}, ${transformParseVnode(
+      node.children,
+      selfLevel,
+      st + 1,
+      variableName
+    )}),`;
   }
-  return str
+  return str;
 }
 
 function patchVnodeComment(node, variableName) {
-  variableName.push(`commentNodeInfo${variableName.length + 1}`)
-  const currentVariableName = variableName.at(-1)
+  variableName.push(`commentNodeInfo${variableName.length + 1}`);
+  const currentVariableName = variableName.at(-1);
   return `(${currentVariableName} || (${currentVariableName} = h(\`${node.nodeValue}\`,node_comment_type))),`;
 }
 
@@ -343,21 +384,24 @@ function transformParseVnode(vnode, level, st = 1, variableName = []) {
     hs += "\n" + sts;
     switch (node.type) {
       case NODE.ELEMENT_NODE:
-        hs += patchVnodeElementStr(node, level, i, st, variableName)
+        hs += patchVnodeElementStr(node, level, i, st, variableName);
         break;
       case NODE.TEXT_NODE:
         {
-          let [contentValue, flag] = patchTextContent(
-            node.nodeValue
-          );
+          let [contentValue, flag] = patchTextContent(node.nodeValue);
           if (!flag) {
-            variableName.push(`textNodeInfo${variableName.length + 1}`)
+            variableName.push(`textNodeInfo${variableName.length + 1}`);
           }
-          hs += "(" + ((flag ? '' : `${variableName.at(-1)} || (${variableName.at(-1)} = `) + `h(${contentValue}, node_text_type)${flag ? "" : ")"}),`);
+          hs +=
+            "(" +
+            ((flag
+              ? ""
+              : `${variableName.at(-1)} || (${variableName.at(-1)} = `) +
+              `h(${contentValue}, node_text_type)${flag ? "" : ")"}),`);
         }
         break;
       case NODE.COMMENT_NODE:
-        hs += patchVnodeComment(node, variableName)
+        hs += patchVnodeComment(node, variableName);
         break;
     }
     if (vnode && vnode.length > 0) {
@@ -373,26 +417,29 @@ function warn(...msg) {
 }
 
 function patchVariableName(names) {
-  return names.reduce((pre, cur) => (pre ? pre + ',' : "let ") + `${cur}`, '')
+  return names.reduce((pre, cur) => (pre ? pre + "," : "let ") + `${cur}`, "");
 }
 
 function transfrom$$(template) {
   const parseNodes = baseParse(template || "");
-  const variableName = []
-  const fiberTree = transformParseVnode(parseNodes, [], 4, variableName, 0)
+  const variableName = [];
+  const fiberTree = transformParseVnode(parseNodes, [], 4, variableName, 0);
   return new Function(
     "hooks,logHooks",
     `
       var {warn} = logHooks
       var fnMps = []
       var fnMpsOne = []
-      var { h,patchEventMemory } = hooks
+      var { h,patchEventMemory,patchForFill } = hooks
       var vn = null;
       var node_comment_type = {
         shapeFlag:${COMMENT_NODE}
       }
       var node_text_type = {
         shapeFlag:${TEXT_NODE}
+      }
+      var node_fragment_type = {
+        shapeFlag:${FRAGMENT_NODE}
       }
       ${patchVariableName(variableName)}
       return function(){
@@ -603,7 +650,7 @@ function useRender(options, ctx) {
   return [
     () => {
       if (!renderHandle) {
-        renderHandle = vnodeHooks.rendering(ctx.$el);
+        renderHandle = vnodeHooks.createRender(ctx.$el);
       }
       if (ctx.diffFiber) ctx.diffFiber.stop();
       ctx.diffFiber = renderHandle(renderVnodeStructure.apply(ctx));

@@ -421,8 +421,22 @@ function useParseAttr(context, value, attrs, node, nodes) {
         if (flag) {
             return 1
         }
+    } else if (nodeName === "for") {
+        if (parseNodeAttrFor(nodeValue, node)) return null
     }
     return attr
+}
+
+function parseNodeAttrFor(nodeValue, node) {
+    const ctxContent = /^(.+)\s(in|of)\s(.+)$/.exec(nodeValue);
+    if (ctxContent) {
+        node.forCtx = {
+            label: ctxContent[2],
+            variable: ctxContent[1],
+            content: last(ctxContent)
+        }
+        return true
+    }
 }
 
 function parseText(context, ancestors) {

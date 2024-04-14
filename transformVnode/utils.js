@@ -39,6 +39,67 @@ export function indexOf(target, key) {
   return target.indexOf(key) > -1
 }
 
+function isNumber(value) {
+  return typeof value === 'number'
+}
+
+export function clearArrayValue(target) {
+  target.splice(target.length, 1)
+}
+
+function objectToArrayMap(target) {
+  const values = Object.values(target);
+  const proto = values.__proto__
+  values.__proto__ = {
+    map(callback) {
+      const keys = Object.keys(target)
+      let newArr = [];
+      for (let i = 0; i < keys.length; i++) {
+        newArr.push(callback(values[i], keys[i], values));
+      }
+      return newArr
+    }
+  }
+  values.__proto__.__proto__ = proto
+  return values
+}
+
+function iterateDataToArrayMap(target) {
+  const flag = target instanceof Set ? 0 : 1
+  return {
+    map(callback) {
+      const newArr = []
+      let index = 0
+      for (let value of target) {
+        const [k, v] = !flag ? [index, value] : value
+        newArr.push(callback(v, k, target))
+        index++
+      }
+      return newArr
+    }
+  }
+}
+
+export function patchForFill(target) {
+  if (isString(target)) {
+    try {
+      return [...(target)]
+    } catch {
+      const arr = new Array(target.length).fill(1)
+      return arr.map((value, index) => target[index])
+    }
+  } else if (isNumber(target)) {
+    if (target < 0) {
+      return []
+    }
+    return new Array(target).fill(0).map((value, index) => index)
+  } else if (isObject(target)) {
+    return objectToArrayMap(target)
+  } else if (!isArray(target)) {
+    return iterateDataToArrayMap(target)
+  }
+  return target
+}
 
 
 function getSequence(arr) {
@@ -90,6 +151,39 @@ function getSequence(arr) {
 
 // console.log(getSequence([1, 3, 2, 2, 4, 5, 6, 7, 8, 2]));
 
+
+
+function getSequence2(arr) {
+  if (arr.length === 0) return 0;
+  let result = [arr[0]];
+  for (let i = 1; i < arr.length; i++) {
+    if (result.at(-1) < arr[i]) {
+      result.push(arr[i]);
+    } else {
+      let j = 0;
+      let k = result.length - 1;
+      let preValue = result[j];
+      while (j < k) {
+        const mid = Math.floor((k + j) / 2);
+        if (result[mid] < arr[i]) {
+          j = mid;
+        } else {
+          if (
+            preValue !== null &&
+            preValue < result[mid] &&
+            result[mid] > arr[i]
+          ) {
+            break;
+          }
+          preValue = result[mid];
+          j = mid + 1;
+        }
+      }
+      result[j] = arr[i];
+    }
+  }
+  return result.length;
+}
 
 
 export function sort(arr) {
