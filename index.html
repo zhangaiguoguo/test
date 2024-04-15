@@ -1,48 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-    <style></style>
-  </head>
 
-  <body class="body">
-    <button class="switch">点击切换</button>
-    <button class="switch2">点击切换2</button>
-    <button class="switch3">点击切换3(null)</button>
-    <div id="root"></div>
-    <div id="app"></div>
-  </body>
-  <script src="./jquery.js"></script>
-  <script src="./index.js"></script>
-  <script src="./pinia.js"></script>
-  <script type="module">
-    import {
-      createApp,
-      getCurrentInstance,
-      h,
-    } from "./transformVnode/index.js";
-    const data = {
-      num: 1,
-      name: "张三",
-      done: true,
-    };
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document</title>
+  <style></style>
+</head>
 
-    var ctx = createApp({
-      template: `
-        ${new Array(2).fill(1).map(() => {
-          return `<div :class="num % 2 ?'root':'root-2'">
+<body class="body">
+  <button class="switch">点击切换</button>
+  <button class="switch2">点击切换2</button>
+  <button class="switch3">点击切换3(null)</button>
+  <div id="root"></div>
+  <div id="app"></div>
+</body>
+<script src="./jquery.js"></script>
+<script src="./index.js"></script>
+<script src="./pinia.js"></script>
+<script type="module">
+  import {
+    createApp,
+    getCurrentInstance,
+    h,
+  } from "./transformVnode/index.js";
+  const data = {
+    num: 1,
+    name: "张三",
+    done: true,
+  };
+
+  var ctx = createApp({
+    template: `
+        ${new Array(1).fill(1).map(() => {
+      return `<div :class="num % 2 ?'root':'root-2'">
               <button :key="1" @click="fn" :num="num">点击++{{ num }}</button>
               <button :key="1" @click="num--" :num="num">点击--{{ num }}</button>
-              <div for="(item,index) in num" :key="index">div{{item}}</div>
-              <div if="num<10">div1</div>
+              <div for="(item,index) in num" :key="index">loop-div{{item}}</div>
+              <div if="num<10">div-1</div>
               <div :num="num" else-if="num<20">
-                div2
+                div-2
                 <h1 if="num>15">{{num > 15}}</h1>
               </div>
-              <div else-if="num<30">div3</div>
-              <div for="(item,index) in num" :key="index">div{{item}}</div>
+              <div else-if="num<30">div-3</div>
               <button a>
                 <span>
                   <i>点击次数{{numCom}}</i>
@@ -55,60 +55,61 @@
               <input type="checkbox" @change=done=!done :checked="done"/>
               <button @click="done = !done">切换</button>
           </div>`;
-        })}
+    })}
       `,
-      data() {
-        return data;
+    data() {
+      return data;
+    },
+    methods: {
+      fn() {
+        this.num++;
       },
-      methods: {
-        fn() {
-          this.num++;
-        },
-        fun() {
-          console.log(arguments);
-        },
+      fun() {
+        console.log(arguments);
       },
-      watch: {
-        "this.done": {
-          handler() {
-            this.fn();
-          },
-        },
-      },
-      computed: {
-        numCom: {
-          get() {
-            return " num：" + this.num;
-          },
-          set(v) {
-            this.num = v;
-          },
+    },
+    watch: {
+      "this.done": {
+        handler() {
+          this.fn();
         },
       },
-    }).mount("#app");
+    },
+    computed: {
+      numCom: {
+        get() {
+          return " num：" + this.num;
+        },
+        set(v) {
+          this.num = v;
+        },
+      },
+    },
+  }).mount("#app");
 
-    console.log(ctx);
-    window.ctx = ctx;
-  </script>
+  console.log(ctx);
+  window.ctx = ctx;
+</script>
 
-  <script>
-    // console.log(hooks);
-    // console.log(pinia)
-    // pinia.installReactiveHooks(hooks)
-    // pinia.createPinia()
-    // const stateStore = pinia.defineStore('state',{
-    //   state(){
-    //     return {
-    //       num:1
-    //     }
-    //   },
-    //   getters:{
+<script>
+  // console.log(hooks);
+  // console.log(pinia)
+  // pinia.installReactiveHooks(hooks)
+  // pinia.createPinia()
+  // const stateStore = pinia.defineStore('state',{
+  //   state(){
+  //     return {
+  //       num:1
+  //     }
+  //   },
+  //   getters:{
 
-    //   },
-    //   actions:{
+  //   },
+  //   actions:{
 
-    //   }
-    // })
-    // console.log(stateStore);
-  </script>
+  //   }
+  // })
+  // console.log(stateStore);
+</script>
+
 </html>

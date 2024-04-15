@@ -101,89 +101,34 @@ export function patchForFill(target) {
   return target
 }
 
-
 function getSequence(arr) {
-  if (arr.length <= 1) {
-    return arr;
-  }
-  console.time("sequenceCount");
-  let result = [];
-  let maxLen = 0;
-  let curResult = null;
-  const _ = (i) => {
-    if (maxLen < result[i].length) {
-      maxLen = result[i].length;
-      curResult = result[i];
-    }
-  };
-  for (let i = 0; i < arr.length; i++) {
-    if (result.length) {
-      let cur = null;
-      let li = result.length;
-      while ((li--) > 0) {
-        if (result[li].at(-1) < arr[i] && (cur ? result[li].length > cur.length : true)) {
-          cur = result[li];
-        }
-        _(li);
-      }
-      if (cur) {
-        cur.push(arr[i]);
-      } else {
-        cur = result.at(-1).slice(0, -1);
-        for (let h = cur.length - 1; h >= 0; h--) {
-          if (cur[h] < arr[i]) {
-            break;
-          } else {
-            cur.splice(h, 1);
-          }
-        }
-        cur.push(arr[i]);
-        result.push(cur);
-        _(result.length - 1);
-      }
-    } else {
-      result.push([arr[i]]);
-    }
-  }
-  console.timeEnd("sequenceCount");
-  return curResult;
-}
-
-// console.log(getSequence([1, 3, 2, 2, 4, 5, 6, 7, 8, 2]));
-
-
-
-function getSequence2(arr) {
-  if (arr.length === 0) return 0;
+  let timeKey = `getSequence_${Date.now()}`
+  console.time(timeKey)
+  if (arr.length === 0) return [];
   let result = [arr[0]];
   for (let i = 1; i < arr.length; i++) {
-    if (result.at(-1) < arr[i]) {
+    if (result[result.length - 1] < arr[i]) {
       result.push(arr[i]);
+      continue
     } else {
       let j = 0;
       let k = result.length - 1;
-      let preValue = result[j];
       while (j < k) {
-        const mid = Math.floor((k + j) / 2);
-        if (result[mid] < arr[i]) {
-          j = mid;
-        } else {
-          if (
-            preValue !== null &&
-            preValue < result[mid] &&
-            result[mid] > arr[i]
-          ) {
-            break;
-          }
-          preValue = result[mid];
+        let mid = (k + j) / 2 | 0;
+        if (result[mid] <= arr[i]) {
           j = mid + 1;
+        } else {
+          k = mid
         }
       }
       result[j] = arr[i];
     }
   }
-  return result.length;
+  console.timeEnd(timeKey)
+  return result;
 }
+
+// console.log(getSequence([0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15]));
 
 
 export function sort(arr) {

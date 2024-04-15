@@ -202,12 +202,6 @@ function setNodeValue(node, value) {
   }
 }
 
-function nodeTypeTEXTCOMMENTValidate(vnode, rnode) {
-  if (vnode.content != rnode.content) {
-    setNodeValue(rnode.el, vnode.content);
-  }
-}
-
 const _keys = Object.keys;
 
 function keys(target) {
@@ -551,7 +545,8 @@ class DiffFiber {
   constructor(root) {
     this.root = root;
   }
-  count = 0;
+
+  runingFlag = false
 
   nodes = [];
 
@@ -592,29 +587,25 @@ class DiffFiber {
   }
 
   _runTask() {
-    if (!this.tasks.length) return;
-    var startTime = Date.now();
-    const task = this.tasks.at(-1);
+    if (!this.tasks.length || !this.status) return;
+    const task = this.tasks[0]
     if (task) {
-      this.pop();
-      if (task.type) {
-        this.removeSomeRunDiff(task.type, this.tasks.length - 1);
-      }
+      this.tasks.shift()
       task.run();
+      this.runTask()
     }
-    const endTime = Date.now() - startTime;
-    this.runTask(endTime >= 16);
   }
 
-  runTask(isAsync) {
-    isAsync = isAsync === void 0 ? false : isAsync;
-    if (!this.tasks.length) return;
-    const oldCount = this.count;
-    if (isAsync) {
+  initCurrentRunTime() {
+    this.currentRunTime = Date.now()
+  }
+
+  runTask() {
+    if (Date.now() - this.currentRunTime >= 15) {
+      this.stop()
       diffFiberAsyncRun().then(() => {
-        if (oldCount !== this.count || !this.status) {
-          return;
-        }
+        this.initCurrentRunTime()
+        this.start()
         this._runTask();
       });
     } else {
@@ -622,33 +613,15 @@ class DiffFiber {
     }
   }
 
-  removeSomeRunDiff(type, index) {
-    index--;
-    while (index >= 0 && this.tasks.length) {
-      if (this.tasks[index].type === type) {
-        this.tasks.splice(index, 1);
-      }
-      index--;
-    }
+  runDiff2(vnode) {
+    this.nodes = vNodeCompareDiff(vnode, this.nodes, this);
   }
 
-  runDiff2(vnode, isAsync) {
-    this.count++;
-    this.push({
-      type: "ROOT",
-      run: () => {
-        this.nodes = vNodeCompareDiff(vnode, this.nodes, this);
-      },
-    });
-    const startTime = Date.now();
-    this.runTask(isAsync);
-    // console.log("耗时:", Date.now() - startTime);
-  }
-
-  runDiff(vnode, isAsync) {
+  runDiff(vnode) {
     this.start();
     this.clear();
-    this.runDiff2(vnode, isAsync);
+    this.initCurrentRunTime()
+    this.runDiff2(vnode);
   }
 }
 
@@ -724,150 +697,153 @@ function notKeySame(n1, n2) {
   return n1 !== n2 && n1[KEY] === null && n1[KEY] === null;
 }
 
-let patchVnodeLastNode = null
-
 function vNodeCompareDiffRun(vnode, rnode, parent, diffManager, fragmentLastEl) {
-  if ((!rnode || !rnode.length) && vnode && vnode.length) {
-    for (let i = 0; i < vnode.length; i++) {
-      if (vnode[i] === null) continue;
-      const node = new VNode(
-        vnode[i],
-        VNODE_OPERATE_PERM | VNODE_AUTO_ADDEVENT
-      );
+  if (!rnode) rnode = []
+  diffManager.push({
+    run() {
+      if ((!rnode || !rnode.length) && vnode && vnode.length) {
+        for (let i = 0; i < vnode.length; i++) {
+          if (vnode[i] === null) continue;
+          const node = new VNode(
+            vnode[i],
+            VNODE_OPERATE_PERM | VNODE_AUTO_ADDEVENT
+          );
 
-      if (fragmentLastEl && !isFragment(node)) {
-        insertBefore(node, fragmentLastEl)
-      } else
-        if (parent) {
-          node.append(parent);
-        }
-      if (!rnode) rnode = []
-      rnode.splice(i, 1, node);
-      if (
-        !isSpecialLabel(node.tag) &&
-        vnode[i].children &&
-        vnode[i].children.length
-      ) {
-        node.children = [];
-        const children = transFormArray(vnode[i].children);
-        vNodeCompareDiffRun(children, node.children, node.el, diffManager, isFragment(node) ? fragmentLastEl : null);
-      }
-    }
-  } else if ((!vnode || !vnode.length) && rnode && rnode.length) {
-    for (let i = 0; i < rnode.length; i++) {
-      rnode[i].remove();
-      rnode.splice(i, 1);
-      i--;
-    }
-  } else if (vnode && rnode) {
-    const diffStore = new DirrStore();
-    let index = 0;
-    let keyStartIndex = 0;
-    const useNodeKeys = [];
-    const dUseNodeKeys = [];
-    for (index; index < vnode.length; index++) {
-      let n1 = vnode[index];
-      let n2 = rnode[index];
-
-      if (isFragment(n1)) {
-        let count = 0
-        if (!isFragment(n2)) {
-          diffStore.diff3(n2)
-          n2 = null
-        } else {
-          count = diffStore.diff(n1, n2)
-        }
-
-        diffStore.push2(n1, n2, count);
-
-        diffStore.diff4(diffStore.useState.at(-1))
-        continue
-      } else if (isFragment(n2)) {
-        diffStore.diff3(n2)
-        n2 = null
-      }
-      if (
-        n2 &&
-        ((n1[KEY] === null && n2[KEY] !== null) ||
-          useNodeKeys.some((kn2) => kn2 === n2))
-      ) {
-        diffStore.diff3(n2);
-        n2 = null;
-      }
-      if (n1[KEY] !== null && (!n2 || n2[KEY] !== n1[KEY])) {
-        const on2 = n2;
-        n2 = null;
-        {
-          for (let i = 0; i < dUseNodeKeys.length; i++) {
-            const node2 = dUseNodeKeys[i];
-            if (node2[KEY] === n1[KEY]) {
-              n2 = node2;
-              dUseNodeKeys.splice(i, 1);
-              break;
+          if (fragmentLastEl && !isFragment(node)) {
+            insertBefore(node, fragmentLastEl)
+          } else
+            if (parent) {
+              node.append(parent);
             }
+          rnode.splice(i, 1, node);
+          if (
+            !isSpecialLabel(node.tag) &&
+            vnode[i].children &&
+            vnode[i].children.length
+          ) {
+            node.children = [];
+            const children = transFormArray(vnode[i].children);
+            vNodeCompareDiffRun(children, node.children, node.el, diffManager, isFragment(node) ? fragmentLastEl : null);
           }
         }
-        while (keyStartIndex < rnode.length && !n2) {
-          const keyN2 = rnode[keyStartIndex];
-          if (keyN2[KEY] !== null && keyN2[KEY] === n1[KEY]) {
-            n2 = keyN2;
-            keyStartIndex++;
-            break;
+      } else if ((!vnode || !vnode.length) && rnode && rnode.length) {
+        for (let i = 0; i < rnode.length; i++) {
+          rnode[i].remove();
+          rnode.splice(i, 1);
+          i--;
+        }
+      } else if (vnode && rnode) {
+        const diffStore = new DirrStore();
+        let index = 0;
+        let keyStartIndex = 0;
+        const useNodeKeys = [];
+        const dUseNodeKeys = [];
+        for (index; index < vnode.length; index++) {
+          let n1 = vnode[index];
+          let n2 = rnode[index];
+
+          if (isFragment(n1)) {
+            let count = 0
+            if (!isFragment(n2)) {
+              diffStore.diff3(n2)
+              n2 = null
+            } else {
+              count = diffStore.diff(n1, n2)
+            }
+
+            diffStore.push2(n1, n2, count);
+
+            diffStore.diff4(diffStore.useState.at(-1))
+            continue
+          } else if (isFragment(n2)) {
+            diffStore.diff3(n2)
+            n2 = null
+          }
+          if (
+            n2 &&
+            ((n1[KEY] === null && n2[KEY] !== null) ||
+              useNodeKeys.some((kn2) => kn2 === n2))
+          ) {
+            diffStore.diff3(n2);
+            n2 = null;
+          }
+          if (n1[KEY] !== null && (!n2 || n2[KEY] !== n1[KEY])) {
+            const on2 = n2;
+            n2 = null;
+            {
+              for (let i = 0; i < dUseNodeKeys.length; i++) {
+                const node2 = dUseNodeKeys[i];
+                if (node2[KEY] === n1[KEY]) {
+                  n2 = node2;
+                  dUseNodeKeys.splice(i, 1);
+                  break;
+                }
+              }
+            }
+            while (keyStartIndex < rnode.length && !n2) {
+              const keyN2 = rnode[keyStartIndex];
+              if (keyN2[KEY] !== null && keyN2[KEY] === n1[KEY]) {
+                n2 = keyN2;
+                keyStartIndex++;
+                break;
+              } else {
+                if (keyN2[KEY] !== null) {
+                  dUseNodeKeys.push(keyN2);
+                }
+              }
+              keyStartIndex++;
+            }
+            if (n1) {
+              useNodeKeys.push(n2);
+            }
+            if (on2 && n2 !== on2) {
+              diffStore.diff3(on2);
+            }
+          }
+          if (!n2) {
           } else {
-            if (keyN2[KEY] !== null) {
-              dUseNodeKeys.push(keyN2);
+            if (
+              n2 &&
+              (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2))
+            ) {
+              diffStore.diff3(n2);
+              n2 = null;
             }
           }
-          keyStartIndex++;
+          let count = 0;
+          if (n2 && n2 === rnode[index]) {
+            if (notKeySame(n1, n2)) {
+
+              count = diffStore.diff(n1, n2);
+            } else {
+
+              count = diffStore.diff(n1, n2, 0b001010);
+            }
+          }
+
+          diffStore.push2(n1, n2, count);
+
+          var ncn = diffStore.useState.at(-1);
+
+          diffStore.diff2(ncn);
+
+          if (!ncn.n2 && !n2) {
+
+            diffStore.diff4(ncn);
+          }
         }
-        if (n1) {
-          useNodeKeys.push(n2);
+        for (index; index < rnode.length; index++) {
+          diffStore.diff3(rnode[index])
         }
-        if (on2 && n2 !== on2) {
-          diffStore.diff3(on2);
-        }
-      }
-      if (!n2) {
-      } else {
-        if (
-          n2 &&
-          (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2))
-        ) {
-          diffStore.diff3(n2);
-          n2 = null;
-        }
-      }
-      let count = 0;
-      if (n2 && n2 === rnode[index]) {
-        if (notKeySame(n1, n2)) {
 
-          count = diffStore.diff(n1, n2);
-        } else {
+        // console.log(diffStore);
+        // debugger
 
-          count = diffStore.diff(n1, n2, 0b001010);
-        }
-      }
-
-      diffStore.push2(n1, n2, count);
-
-      var ncn = diffStore.useState.at(-1);
-
-      diffStore.diff2(ncn);
-
-      if (!ncn.n2 && !n2) {
-
-        diffStore.diff4(ncn);
+        runDiffStore(diffStore, vnode, rnode, parent, diffManager, fragmentLastEl);
       }
     }
-    for (index; index < rnode.length; index++) {
-      diffStore.diff3(rnode[index])
-    }
-
-    // console.log(diffStore);
-    // debugger
-
-    runDiffStore(diffStore, vnode, rnode, parent, diffManager, fragmentLastEl);
-  }
+  })
+  diffManager.runTask()
   return rnode;
 }
 
@@ -938,17 +914,12 @@ function patch(nn1, cn, nn2, last, n2, parent, diffManager, diffStore) {
       if (typeof vnChildren === "string") {
         vnChildren = [createVnodeText(vnChildren)];
       }
-      diffManager.push({
-        run: () => {
-          cn.children = vNodeCompareDiffRun(
-            vnChildren,
-            newChildren,
-            cn.el,
-            diffManager
-          );
-        },
-      });
-      diffManager.runTask();
+      cn.children = vNodeCompareDiffRun(
+        vnChildren,
+        newChildren,
+        cn.el,
+        diffManager
+      );
     }
   }
 
@@ -996,7 +967,7 @@ function patchFragment(nn1, cn, nn2, last, n2, parent, diffManager) {
       if (last) {
         cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, last)
       } else if (nn2) {
-        const curNode = isFragment(nn2) ? getLastFragmentNode(n2, ni) : nn2
+        const curNode = isFragment(nn2) ? getLastFragmentNode(n2, ni) : nn2;
         cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, curNode)
       } else {
         cn.append(parent);
@@ -1023,7 +994,6 @@ function patchFragment(nn1, cn, nn2, last, n2, parent, diffManager) {
 }
 
 function runDiffStore(diffStore, n1, n2, parent, diffManager, fragmentLastEl) {
-  patchVnodeLastNode = null
   const didUseState = diffStore.didUseState;
   for (let i = 0; i < didUseState.length; i++) {
     if (didUseState[i] && didUseState[i].el) {
