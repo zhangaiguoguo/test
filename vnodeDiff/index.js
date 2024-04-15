@@ -561,21 +561,7 @@ class DiffFiber {
   }
 
   clear() {
-    this.count++;
     this.tasks = [];
-  }
-
-  remove(task) {
-    var sub = this.tasks.indexOf(task);
-    if (sub !== -1) {
-      this.tasks.splice(sub, 1);
-      return true;
-    }
-    return false;
-  }
-
-  pop() {
-    return this.tasks.pop();
   }
 
   stop() {
@@ -583,11 +569,16 @@ class DiffFiber {
   }
 
   start() {
+    this.runingFlag = false
     this.status = true;
   }
 
   _runTask() {
-    if (!this.tasks.length || !this.status) return;
+    const flag = !this.tasks.length
+    if (flag) {
+      this.runingFlag = false
+    }
+    if (flag || !this.status) return;
     const task = this.tasks[0]
     if (task) {
       this.tasks.shift()
@@ -601,7 +592,7 @@ class DiffFiber {
   }
 
   runTask() {
-    if (Date.now() - this.currentRunTime >= 15) {
+    if (Date.now() - this.currentRunTime >= 16) {
       this.stop()
       diffFiberAsyncRun().then(() => {
         this.initCurrentRunTime()
@@ -615,6 +606,12 @@ class DiffFiber {
 
   runDiff2(vnode) {
     this.nodes = vNodeCompareDiff(vnode, this.nodes, this);
+  }
+
+  run() {
+    if (this.runingFlag) return
+    this.runingFlag = true
+    this.runTask()
   }
 
   runDiff(vnode) {
@@ -723,7 +720,7 @@ function vNodeCompareDiffRun(vnode, rnode, parent, diffManager, fragmentLastEl) 
           ) {
             node.children = [];
             const children = transFormArray(vnode[i].children);
-            vNodeCompareDiffRun(children, node.children, node.el, diffManager, isFragment(node) ? fragmentLastEl : null);
+            node.children = vNodeCompareDiffRun(children, node.children, node.el, diffManager, isFragment(node) ? fragmentLastEl : null);
           }
         }
       } else if ((!vnode || !vnode.length) && rnode && rnode.length) {
@@ -841,9 +838,9 @@ function vNodeCompareDiffRun(vnode, rnode, parent, diffManager, fragmentLastEl) 
 
         runDiffStore(diffStore, vnode, rnode, parent, diffManager, fragmentLastEl);
       }
-    }
+    },
   })
-  diffManager.runTask()
+  diffManager.run()
   return rnode;
 }
 
