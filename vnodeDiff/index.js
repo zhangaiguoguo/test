@@ -28,8 +28,8 @@ function parseAttrsEvent(attrs) {
     let isEventExec = null;
     if ((isEventExec = eventExec(k))) {
       evts[
-        k.slice(isEventExec.index + isEventExec[0].length) +
-        (isEventExec.at(-1) ? isEventExec.at(-1).toLocaleLowerCase() : "")
+        (isEventExec.at(-1) ? isEventExec.at(-1).toLocaleLowerCase() : "") +
+        k.slice(isEventExec.index + isEventExec[0].length)
       ] = attrs[k];
       delete attrs[k];
       continue;
@@ -176,7 +176,7 @@ function createRNode(node) {
     switch (NODETYPE) {
       case ELEMENT:
         rNode = document.createElement(node.tag);
-        setNodeAttrs(rNode, node.attrs);
+        setAttribute2(node, { el: rNode });
         break;
       case TEXT:
         rNode = document.createTextNode(node.content);
@@ -242,11 +242,11 @@ class DirrStore {
       (ii) => (ii.n1 === n1 && ii.n2 === n2) || (ii.n1 === n2 && ii.n2 === n1)
     );
   }
-  diff(n1, n2, perm = DirrStore.perms[2]) {
+  diff(n1, n2, perm = DirrStore.perms[2]) { 
     let count = 0;
     if (!n2) return count;
     if (
-      isSameKey(n1, n2) || isSameNodeType(n1, n2)
+      isSameKey(n1, n2) || !isSameNodeType(n1, n2)
     )
       return count;
     const cCount = this.find(n1, n2);
@@ -469,7 +469,7 @@ class DirrStore {
         flag = true;
         continue;
       }
-      if (isSameNodeType(cn.n1, n)) {
+      if (!isSameNodeType(cn.n1, n)) {
         continue
       }
       if (isDiffFragmentFlag(cn.n1, n)) {
@@ -512,6 +512,7 @@ class DirrStore {
     }
   }
   clear() {
+    return
     this.useState = [];
     this.didUseState = [];
     this.didUseState2 = [];
@@ -746,6 +747,7 @@ function patchDiffNode(vnode, rnode, parent, fragmentLastEl) {
   for (index; index < rnode.length; index++) {
     diffStore.diff3(rnode[index])
   }
+  console.log(diffStore);
   runDiffStore(diffStore, vnode, rnode, parent, fragmentLastEl);
 }
 

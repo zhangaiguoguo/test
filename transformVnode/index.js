@@ -133,7 +133,7 @@ function parseHShapeFlag(type) {
 export function h(type, props, children = null) {
   const l = arguments.length;
   if (l === 2) {
-    if (props && (!isObject(props) || props[IS_V_NODE_REF])) {
+    if (props != null && (!isObject(props) || props[IS_V_NODE_REF])) {
       children = props;
       props = null;
     }
@@ -661,9 +661,7 @@ function unMounted(el) {
 function useRender(options, ctx) {
   let renderVnodeStructure = null
   if (isFunction(options.render)) {
-    renderVnodeStructure = () => {
-      return options.render(ctx)
-    }
+    renderVnodeStructure = options.render
   } else {
     renderVnodeStructure = transfrom$$(options.template);
   }
@@ -674,7 +672,7 @@ function useRender(options, ctx) {
       if (!renderHandle) {
         renderHandle = vnodeHooks.createRender(ctx.$el);
       }
-      ctx.nodes = renderHandle(renderVnodeStructure.apply(ctx));
+      ctx.nodes = renderHandle(renderVnodeStructure.apply(ctx,[ctx]));
     },
   ];
 }
@@ -745,4 +743,16 @@ export function createApp(options) {
 
 export function getCurrentInstance() {
   return currentInstance;
+}
+
+const defaultFragmentProps = {
+  shapeFlag: 1
+}
+
+export function createFragmentNode(children) {
+  return h(null, defaultFragmentProps, children)
+}
+
+export function renderList(context, callback) {
+  return createFragmentNode(patchForFill(context).map(callback))
 }

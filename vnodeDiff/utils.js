@@ -157,5 +157,8 @@ export function isCurrentScopeExist(cexits, current) {
 }
 
 export function isSameNodeType(n1, n2) {
-  return getNodeType(n1) === getNodeType(n2)
+  if (n1.tag === n2.tag || n1[KEY] === n2[KEY] || getNodeType(n1) === getNodeType(n2)) {
+    return true
+  };
+  return false
 }
