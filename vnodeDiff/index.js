@@ -259,7 +259,6 @@ class DirrStore {
     if (cCount) {
       return cCount.count;
     }
-    let CURRENT_NODE_PERM = INIT_NODE_PERM();
     var tf1 = null, tf = null;
     if ((perm & DIFFTAGTYPE) === DIFFTAGTYPE) {
       tf1 = getNodeRefType(n1);
@@ -289,7 +288,6 @@ class DirrStore {
           if (n1.attrs[k] === n2.attrs[k]) {
             count++;
           } else {
-            CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_SET;
           }
           ks.push(k);
         }
@@ -300,7 +298,6 @@ class DirrStore {
         if (ks.length === (ks2 && ks2.length)) {
           count++;
         } else {
-          CURRENT_NODE_PERM = CURRENT_NODE_PERM | NODE_ATTR_LENGTH;
         }
       }
     }
@@ -327,7 +324,6 @@ class DirrStore {
         n1,
         n2,
         count,
-        CURRENT_NODE_PERM,
       });
     }
     return count;
@@ -532,7 +528,7 @@ class DirrStore {
 }
 
 let diffFiberAsyncRun = null
-let diffFiberAsyncRunCount = 0
+
 {
   diffFiberAsyncRun =
     typeof requestAnimationFrame === "function"
@@ -574,7 +570,9 @@ class VNode {
       return
     }
     this.el = createRNode(this);
-    setNodeAttrs(this.el, this.attrs);
+    if (getNodeRefType(this) === ELEMENT) {
+      setAttribute2(this, null)
+    }
     if (isCurrentScopeExist(VNODE_OPERATE_PERM, VNODE_CREATE_CHILDREN)) {
       if (isSpecialLabel(this.tag)) {
         vnodeSpecialLabelRun(this);
@@ -782,15 +780,6 @@ function vNodeCompareDiffRun(vnode, rnode, parent, fragmentLastEl) {
 }
 
 function patch(nn1, cn, nn2, last, n2, parent, diffStore) {
-
-  let CURRENT_NODE_PERM = null
-
-  const sub = diffStore.find(nn1, cn);
-
-  if (sub) {
-    CURRENT_NODE_PERM = sub.CURRENT_NODE_PERM;
-  }
-
   {
     if (cn && nn1.tag === "script" && !is(nn1.content, cn.content)) {
       cn.remove();
@@ -859,9 +848,7 @@ function patch(nn1, cn, nn2, last, n2, parent, diffStore) {
   setNodeEvts(cn.el, nn1, cn);
 
   if (!ocn) {
-    if (CURRENT_NODE_PERM > 0) {
-      setAttribute2(nn1, cn, CURRENT_NODE_PERM);
-    }
+    setAttribute2(nn1, cn);
   }
 
   cn.el.__node__ = cn._vnode = nn1;
@@ -1064,29 +1051,24 @@ function patchSpecialNodeAttr(node, key, value) {
   }
 }
 
-function setAttribute2(n1, n2, CURRENT_NODE_PERM) {
+const defaultNodeAttrs = {}
+
+function setAttribute2(n1, n2) {
   let attrs = n1.attrs,
-    attrs2 = n2.attrs;
+    attrs2 = n2 && n2.attrs || {};
   var el = n1.el || n2.el;
-  var NODE_ATTR_LENGTH2 = (CURRENT_NODE_PERM & NODE_ATTR_LENGTH) === NODE_ATTR_LENGTH;
   var attrs2Ks = attrs2 && keys(attrs2);
   if (attrs) {
-    if (
-      (CURRENT_NODE_PERM & NODE_ATTR_SET) === NODE_ATTR_SET ||
-      NODE_ATTR_LENGTH2
-    ) {
-      for (var k in attrs) {
-        if (!attrs2 || !is(attrs2[k], attrs[k])) {
-          n2.attrs = (attrs2 = {})
-          attrs2[k] = attrs[k];
-          patchSpecialNodeAttr(el, k, attrs2[k]);
-          el.setAttribute(k, attrs2[k]);
-        }
-        if (attrs2Ks) {
-          var ki = attrs2Ks.indexOf(k);
-          if (ki !== -1) {
-            attrs2Ks.splice(ki, 1);
-          }
+    for (var k in attrs) {
+      if (!attrs2 || !is(attrs2[k], attrs[k])) {
+        attrs2[k] = attrs[k];
+        patchSpecialNodeAttr(el, k, attrs2[k]);
+        el.setAttribute(k, attrs2[k]);
+      }
+      if (attrs2Ks) {
+        var ki = attrs2Ks.indexOf(k);
+        if (ki !== -1) {
+          attrs2Ks.splice(ki, 1);
         }
       }
     }

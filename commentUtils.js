@@ -30,7 +30,7 @@ function callWithErrorHandling(fn, args) {
     try {
         res = args ? fn(...args) : fn();
     } catch (err) {
-        log.warn1(err)
+        console.warn(err)
     }
     return res;
 }

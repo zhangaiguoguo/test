@@ -52,7 +52,7 @@
                 <h1>我是{{ name }}今年{{num}}岁了</h1>
               </div>
               <div>div3 {{this.done}}</div>
-              <input type="checkbox" :key="Date.now()" @change=done=!done :checked="done"/>
+              <input type="checkbox" :key="100" @change=done=!done :checked="done"/>
               <button @click="done = !done">切换</button>
           </div>`;
     })}
