@@ -36,7 +36,7 @@
       return `<div :class="num % 2 ?'root':'root-2'">
               <button :key="1" @click="fn" :num="num">点击++{{ num }}</button>
               <button :key="1" @click="num--" :num="num">点击--{{ num }}</button>
-              <div for="(item,index) in num" :key="index">loop-div{{item}}</div>
+              <div if="done" for="(item,index) in num" :key="index">loop-div{{item}}</div>
               <div if="num<10">div-1</div>
               <div :num="num" else-if="num<20">
                 div-2
@@ -52,7 +52,7 @@
                 <h1>我是{{ name }}今年{{num}}岁了</h1>
               </div>
               <div>div3 {{this.done}}</div>
-              <input type="checkbox" @change=done=!done :checked="done"/>
+              <input type="checkbox" :key="Date.now()" @change=done=!done :checked="done"/>
               <button @click="done = !done">切换</button>
           </div>`;
     })}

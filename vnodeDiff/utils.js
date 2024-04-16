@@ -95,6 +95,20 @@ export function isDiffFragmentFlag(n1, n2) {
   return ((flag && !flag2) || (!flag && flag2))
 }
 
+export function isSameKey(n1, n2) {
+  return (n1 && n1[KEY] !== null && n2 && n2[KEY] === null) || ((n1 && n1[KEY] === null && n2 && n2[KEY] !== null))
+}
+
+export function isSameNodeType2(n1, n2) {
+  if (isSameNodeType(n1, n2)) {
+    return true
+  }
+  return n1[KEY] !== n2[KEY]
+}
+
+export function clearArrayValue(target) {
+  target.splice(0, target.length)
+}
 
 export const KEY_PERM_KEY = "KEY_PERM";
 export const KEY_PERM_N1_PERM = 0b000001;
@@ -142,6 +156,6 @@ export function isCurrentScopeExist(cexits, current) {
   return (cexits & current) === current;
 }
 
-export function isSameNodeType(n1,n2){
+export function isSameNodeType(n1, n2) {
   return getNodeType(n1) === getNodeType(n2)
 }

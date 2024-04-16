@@ -320,35 +320,11 @@ function patchNodeAttrs(node, variableName) {
   return [content, flag];
 }
 
-function patchVnodeElementStr(node, level, i, st, variableName) {
-  let str = "";
-  const selfLevel = [...level, i];
-  if (node.condition && node.condition.length) {
-    const condition = node.condition;
-    if (condition.at(-1).conditionValue.nodeName !== ATTRIFREF[1]) {
-      condition.push(createCommentNode("if"));
-    }
-    let conditionStr = "";
-    let index = 0;
-    while (index < condition.length - 1) {
-      const it = condition[index];
-      const [attrStr] = patchNodeAttrs(it, variableName);
-      conditionStr += `${conditionStr ? " : " : ""}(${it.conditionValue.nodeValue
-        }) ? (${`h(\`${it.tag}\`,${attrStr}, ${transformParseVnode(
-          it.children,
-          selfLevel,
-          st + 1,
-          variableName
-        )})`})`;
-      index++;
-    }
-    const lastIt = condition[condition.length - 1];
-    conditionStr += `:${patchVnodeComment(lastIt, variableName).slice(0, -1)}`;
-    str += `(${conditionStr}),`;
-  } else if (node.forCtx) {
+function patchVnodeForCtx(node, selfLevel, st, variableName) {
+  if (node.forCtx) {
     const forCtx = node.forCtx;
     const [attrStr] = patchNodeAttrs(node, variableName);
-    str += `h(null,node_fragment_type,patchForFill(${forCtx.content}).map(${forCtx.variable
+    return `h(null,node_fragment_type,patchForFill(${forCtx.content}).map(${forCtx.variable
       } => {
     return h(\`${node.tag}\`,${attrStr}, ${transformParseVnode(
         node.children,
@@ -357,14 +333,53 @@ function patchVnodeElementStr(node, level, i, st, variableName) {
         variableName
       )}) 
   })),`;
+  }
+}
+
+function patchVnodeElementStr(node, level, i, st, variableName) {
+  let str = "";
+  const selfLevel = [...level, i];
+  if (node.condition && node.condition.length) {
+    const condition = node.condition;
+    if (condition.at(-1).conditionValue.nodeName !== ATTRIFREF[1]) {
+      condition.push(createCommentNode(" if "));
+    }
+    let conditionStr = "";
+    let index = 0;
+    while (index < condition.length - 1) {
+      const it = condition[index];
+      let curCtxContext = patchVnodeForCtx(node, selfLevel, st, variableName)
+      if (curCtxContext) {
+        curCtxContext = curCtxContext.slice(0, -1)
+      } else {
+        const [attrStr] = patchNodeAttrs(it, selfLevel, variableName);
+        curCtxContext = `h(\`${it.tag}\`,${attrStr}, ${transformParseVnode(
+          it.children,
+          selfLevel,
+          st + 1,
+          variableName
+        )})`
+      }
+      conditionStr += `${conditionStr ? " : " : ""}(${it.conditionValue.nodeValue
+        }) ? (${curCtxContext})`;
+      index++;
+    }
+    const lastIt = condition[condition.length - 1];
+    conditionStr += `:${patchVnodeComment(lastIt, variableName).slice(0, -1)}`;
+    str += `(${conditionStr}),`;
   } else {
-    const [attrStr] = patchNodeAttrs(node, variableName);
-    str += `h(\`${node.tag}\`,${attrStr}, ${transformParseVnode(
-      node.children,
-      selfLevel,
-      st + 1,
-      variableName
-    )}),`;
+    const forCtxContext = patchVnodeForCtx(node, selfLevel, st, variableName)
+    if (forCtxContext) {
+      str += forCtxContext
+    } else {
+      const [attrStr] = patchNodeAttrs(node, variableName);
+      str += `h(\`${node.tag}\`,${attrStr}, ${transformParseVnode(
+        node.children,
+        selfLevel,
+        st + 1,
+        variableName
+      )}),`;
+    }
   }
   return str;
 }
@@ -652,8 +667,7 @@ function useRender(options, ctx) {
       if (!renderHandle) {
         renderHandle = vnodeHooks.createRender(ctx.$el);
       }
-      if (ctx.diffFiber) ctx.diffFiber.stop();
-      ctx.diffFiber = renderHandle(renderVnodeStructure.apply(ctx));
+      ctx.nodes = renderHandle(renderVnodeStructure.apply(ctx));
     },
   ];
 }

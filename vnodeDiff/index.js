@@ -1,4 +1,5 @@
-import { is, KEY, extend, toRawType, has, createObjArray, def, transFormArray, TEXT, COMMENT, ELEMENT, FRAGMENT, TEXT_NODE, ELEMENT_NODE, COMMENT_NODE, FRAGMENT_NODE, ELEMENT_TYPE, isTextContentNode, getNodeType as getNodeRefType, isFragment, isDiffFragmentFlag, diffKey$, isSpecialLabel, isCurrentScopeExist, KEY_PERM_N_PERM, KEY_PERM_N1_PERM, KEY_PERM_N2_PERM, isSameNodeType } from "./utils.js";
+import { queueJob } from "../commentUtils.js";
+import { is, KEY, extend, toRawType, has, createObjArray, def, transFormArray, TEXT, COMMENT, ELEMENT, FRAGMENT, TEXT_NODE, ELEMENT_NODE, COMMENT_NODE, FRAGMENT_NODE, ELEMENT_TYPE, isTextContentNode, getNodeType as getNodeRefType, isFragment, isDiffFragmentFlag, diffKey$, isSpecialLabel, isCurrentScopeExist, KEY_PERM_N_PERM, KEY_PERM_N1_PERM, KEY_PERM_N2_PERM, isSameNodeType, isSameKey, clearArrayValue } from "./utils.js";
 
 function createvNodeBloak(callback) {
   const _callback = callback || ((v) => v);
@@ -189,10 +190,11 @@ function createRNode(node) {
   return rNode;
 }
 
-function vNodeCompareDiff(vnode, rnode, diffManager) {
+function vNodeCompareDiff(vnode, rnode, root) {
   const vnodes = transFormArray(vnode);
   const rnodes = transFormArray(rnode).filter(Boolean);
-  vNodeCompareDiffRun(vnodes, rnodes, diffManager.root, diffManager);
+  initCurrentRunTime(true)
+  vNodeCompareDiffRun(vnodes, rnodes, root);
   return rnodes;
 }
 
@@ -250,8 +252,7 @@ class DirrStore {
     let count = 0;
     if (!n2) return count;
     if (
-      (n1[KEY] !== null && n2[KEY] === null) ||
-      (n1[KEY] === null && n2[KEY] !== null)
+      isSameKey(n1, n2) || isSameNodeType(n1, n2)
     )
       return count;
     const cCount = this.find(n1, n2);
@@ -350,8 +351,7 @@ class DirrStore {
           (ii) => ii.n1 === dn && ii.n2 === un && ii.count === un.count
         ) ||
         dn === un.n2 ||
-        ((isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM) ||
-          dn[KEY] !== null) &&
+        ((isCurrentScopeExist(KEY_PERM, KEY_PERM_N1_PERM)) &&
           un.n1[KEY] !== dn[KEY])
       )
         continue;
@@ -469,6 +469,7 @@ class DirrStore {
     }
   }
   diff3(n, usens) {
+    if (!n) return
     usens = transFormArray(usens);
     let flag = false;
     let index = null;
@@ -479,7 +480,7 @@ class DirrStore {
         continue;
       }
       if (isSameNodeType(cn.n1, n)) {
-        confirm
+        continue
       }
       if (isDiffFragmentFlag(cn.n1, n)) {
         continue
@@ -487,13 +488,12 @@ class DirrStore {
         const KEY_PERM = this.diffKey(cn.n1, cn.n2);
         if (
           isCurrentScopeExist(KEY_PERM, KEY_PERM_N_PERM) ||
-          (n[KEY] !== null && cn.n1[KEY] === null) ||
-          (cn.n1[KEY] !== null && n[KEY] === null)
+          isSameKey(n, cn.n1)
         )
           continue;
       }
       if (this.diff3StatusSome(cn, n)) continue;
-      if (n[KEY] !== null && cn.n1[KEY] !== null && cn.n1[KEY] !== n[KEY]) {
+      if (cn.n1[KEY] !== n[KEY]) {
         continue;
       }
       const count = this.diff(cn.n1, n);
@@ -531,95 +531,17 @@ class DirrStore {
   }
 }
 
-const diffFiberAsyncRun =
-  typeof requestAnimationFrame === "function"
-    ? () => ({
-      then(fn) {
-        return requestAnimationFrame(fn);
-      },
-    })
-    : () => Promise.resolve();
-
-class DiffFiber {
-  root = void 0;
-  constructor(root) {
-    this.root = root;
-  }
-
-  runingFlag = false
-
-  nodes = [];
-
-  tasks = [];
-
-  cTasks = null;
-
-  status = true;
-
-  push(task) {
-    this.tasks.push(task);
-  }
-
-  clear() {
-    this.tasks = [];
-  }
-
-  stop() {
-    this.status = false;
-  }
-
-  start() {
-    this.runingFlag = false
-    this.status = true;
-  }
-
-  _runTask() {
-    const flag = !this.tasks.length
-    if (flag) {
-      this.runingFlag = false
-    }
-    if (flag || !this.status) return;
-    const task = this.tasks[0]
-    if (task) {
-      this.tasks.shift()
-      task.run();
-      this.runTask()
-    }
-  }
-
-  initCurrentRunTime() {
-    this.currentRunTime = Date.now()
-  }
-
-  runTask() {
-    if (Date.now() - this.currentRunTime >= 16) {
-      this.stop()
-      diffFiberAsyncRun().then(() => {
-        this.initCurrentRunTime()
-        this.start()
-        this._runTask();
-      });
-    } else {
-      this._runTask();
-    }
-  }
-
-  runDiff2(vnode) {
-    this.nodes = vNodeCompareDiff(vnode, this.nodes, this);
-  }
-
-  run() {
-    if (this.runingFlag) return
-    this.runingFlag = true
-    this.runTask()
-  }
-
-  runDiff(vnode) {
-    this.start();
-    this.clear();
-    this.initCurrentRunTime()
-    this.runDiff2(vnode);
-  }
+let diffFiberAsyncRun = null
+let diffFiberAsyncRunCount = 0
+{
+  diffFiberAsyncRun =
+    typeof requestAnimationFrame === "function"
+      ? () => ({
+        then(fn) {
+          return requestAnimationFrame(fn);
+        },
+      })
+      : () => Promise.resolve();
 }
 
 const VNODE_CREATE_CHILDREN = 0b00001;
@@ -694,157 +616,172 @@ function notKeySame(n1, n2) {
   return n1 !== n2 && n1[KEY] === null && n1[KEY] === null;
 }
 
-function vNodeCompareDiffRun(vnode, rnode, parent, diffManager, fragmentLastEl) {
-  if (!rnode) rnode = []
-  diffManager.push({
-    run() {
-      if ((!rnode || !rnode.length) && vnode && vnode.length) {
-        for (let i = 0; i < vnode.length; i++) {
-          if (vnode[i] === null) continue;
-          const node = new VNode(
-            vnode[i],
-            VNODE_OPERATE_PERM | VNODE_AUTO_ADDEVENT
-          );
+function patchCreateNewNodes(vnode, rnode, parent, fragmentLastEl) {
+  for (let i = 0; i < vnode.length; i++) {
+    if (vnode[i] === null) continue;
+    const node = new VNode(
+      vnode[i],
+      VNODE_OPERATE_PERM | VNODE_AUTO_ADDEVENT
+    );
 
-          if (fragmentLastEl && !isFragment(node)) {
-            insertBefore(node, fragmentLastEl)
-          } else
-            if (parent) {
-              node.append(parent);
-            }
-          rnode.splice(i, 1, node);
-          if (
-            !isSpecialLabel(node.tag) &&
-            vnode[i].children &&
-            vnode[i].children.length
-          ) {
-            node.children = [];
-            const children = transFormArray(vnode[i].children);
-            node.children = vNodeCompareDiffRun(children, node.children, node.el, diffManager, isFragment(node) ? fragmentLastEl : null);
-          }
-        }
-      } else if ((!vnode || !vnode.length) && rnode && rnode.length) {
-        for (let i = 0; i < rnode.length; i++) {
-          rnode[i].remove();
-          rnode.splice(i, 1);
-          i--;
-        }
-      } else if (vnode && rnode) {
-        const diffStore = new DirrStore();
-        let index = 0;
-        let keyStartIndex = 0;
-        const useNodeKeys = [];
-        const dUseNodeKeys = [];
-        for (index; index < vnode.length; index++) {
-          let n1 = vnode[index];
-          let n2 = rnode[index];
-
-          if (isFragment(n1)) {
-            let count = 0
-            if (!isFragment(n2)) {
-              diffStore.diff3(n2)
-              n2 = null
-            } else {
-              count = diffStore.diff(n1, n2)
-            }
-
-            diffStore.push2(n1, n2, count);
-
-            diffStore.diff4(diffStore.useState.at(-1))
-            continue
-          } else if (isFragment(n2)) {
-            diffStore.diff3(n2)
-            n2 = null
-          }
-          if (
-            n2 &&
-            ((n1[KEY] === null && n2[KEY] !== null) ||
-              useNodeKeys.some((kn2) => kn2 === n2))
-          ) {
-            diffStore.diff3(n2);
-            n2 = null;
-          }
-          if (n1[KEY] !== null && (!n2 || n2[KEY] !== n1[KEY])) {
-            const on2 = n2;
-            n2 = null;
-            {
-              for (let i = 0; i < dUseNodeKeys.length; i++) {
-                const node2 = dUseNodeKeys[i];
-                if (node2[KEY] === n1[KEY]) {
-                  n2 = node2;
-                  dUseNodeKeys.splice(i, 1);
-                  break;
-                }
-              }
-            }
-            while (keyStartIndex < rnode.length && !n2) {
-              const keyN2 = rnode[keyStartIndex];
-              if (keyN2[KEY] !== null && keyN2[KEY] === n1[KEY]) {
-                n2 = keyN2;
-                keyStartIndex++;
-                break;
-              } else {
-                if (keyN2[KEY] !== null) {
-                  dUseNodeKeys.push(keyN2);
-                }
-              }
-              keyStartIndex++;
-            }
-            if (n1) {
-              useNodeKeys.push(n2);
-            }
-            if (on2 && n2 !== on2) {
-              diffStore.diff3(on2);
-            }
-          }
-          if (!n2) {
-          } else {
-            if (
-              n2 &&
-              (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2))
-            ) {
-              diffStore.diff3(n2);
-              n2 = null;
-            }
-          }
-          let count = 0;
-          if (n2 && n2 === rnode[index]) {
-            if (notKeySame(n1, n2)) {
-
-              count = diffStore.diff(n1, n2);
-            } else {
-
-              count = diffStore.diff(n1, n2, 0b001010);
-            }
-          }
-
-          diffStore.push2(n1, n2, count);
-
-          var ncn = diffStore.useState.at(-1);
-
-          diffStore.diff2(ncn);
-
-          if (!ncn.n2 && !n2) {
-
-            diffStore.diff4(ncn);
-          }
-        }
-        for (index; index < rnode.length; index++) {
-          diffStore.diff3(rnode[index])
-        }
-
-        // console.log(diffStore);
-        // debugger
-
-        runDiffStore(diffStore, vnode, rnode, parent, diffManager, fragmentLastEl);
+    if (fragmentLastEl && !isFragment(node)) {
+      insertBefore(node, fragmentLastEl)
+    } else
+      if (parent) {
+        node.append(parent);
       }
-    },
-  })
-  diffManager.run()
+    rnode.splice(i, 1, node);
+    if (
+      !isSpecialLabel(node.tag) &&
+      vnode[i].children &&
+      vnode[i].children.length
+    ) {
+      node.children = [];
+      const children = transFormArray(vnode[i].children);
+      node.children = vNodeCompareDiffRun(children, node.children, node.el, isFragment(node) ? fragmentLastEl : null);
+    }
+  }
+}
+
+function unmountedNodes(vnode, rnode, parent, fragmentLastEl) {
+  for (let i = 0; i < rnode.length; i++) {
+    rnode[i].remove();
+    rnode.splice(i, 1);
+    i--;
+  }
+}
+
+function patchDiffNode(vnode, rnode, parent, fragmentLastEl) {
+  const diffStore = new DirrStore();
+  let index = 0;
+  let keyStartIndex = 0;
+  const useNodeKeys = [];
+  const dUseNodeKeys = [];
+  for (index; index < vnode.length; index++) {
+    let n1 = vnode[index];
+    let n2 = rnode[index];
+
+    if (isFragment(n1)) {
+      let count = 0
+      if (!isFragment(n2)) {
+        diffStore.diff3(n2)
+        n2 = null
+      } else {
+        count = diffStore.diff(n1, n2)
+      }
+
+      diffStore.push2(n1, n2, count);
+
+      diffStore.diff4(diffStore.useState.at(-1))
+      continue
+    } else if (isFragment(n2)) {
+      diffStore.diff3(n2)
+      n2 = null
+    }
+    if (
+      n2 &&
+      ((n1[KEY] === null && n2[KEY] !== null) ||
+        useNodeKeys.some((kn2) => kn2 === n2))
+    ) {
+      diffStore.diff3(n2);
+      n2 = null;
+    }
+    if (n1[KEY] !== null && (!n2 || n2[KEY] !== n1[KEY])) {
+      const on2 = n2;
+      n2 = null;
+      {
+        for (let i = 0; i < dUseNodeKeys.length; i++) {
+          const node2 = dUseNodeKeys[i];
+          if (node2[KEY] === n1[KEY]) {
+            n2 = node2;
+            dUseNodeKeys.splice(i, 1);
+            break;
+          }
+        }
+      }
+      while (keyStartIndex < rnode.length && !n2) {
+        const keyN2 = rnode[keyStartIndex];
+        if (keyN2[KEY] !== null && keyN2[KEY] === n1[KEY]) {
+          n2 = keyN2;
+          keyStartIndex++;
+          break;
+        } else {
+          if (keyN2[KEY] !== null) {
+            dUseNodeKeys.push(keyN2);
+          }
+        }
+        keyStartIndex++;
+      }
+      if (n1) {
+        useNodeKeys.push(n2);
+      }
+      if (on2 && n2 !== on2) {
+        diffStore.diff3(on2);
+      }
+    }
+    if (!n2) {
+    } else {
+      if (
+        n2 &&
+        (n1.tag !== n2.tag || getNodeRefType(n1) !== getNodeRefType(n2))
+      ) {
+        diffStore.diff3(n2);
+        n2 = null;
+      }
+    }
+    let count = 0;
+    if (n2 && n2 === rnode[index]) {
+      if (notKeySame(n1, n2)) {
+
+        count = diffStore.diff(n1, n2);
+      } else {
+
+        count = diffStore.diff(n1, n2, 0b001010);
+      }
+    }
+
+    diffStore.push2(n1, n2, count);
+
+    var ncn = diffStore.useState.at(-1);
+
+    diffStore.diff2(ncn);
+
+    if (!ncn.n2 && !n2) {
+
+      diffStore.diff4(ncn);
+    }
+  }
+  for (index; index < rnode.length; index++) {
+    diffStore.diff3(rnode[index])
+  }
+  runDiffStore(diffStore, vnode, rnode, parent, fragmentLastEl);
+}
+
+let currentRunTime = null
+
+function getCurrentRunTime() {
+  return Date.now() - currentRunTime
+}
+
+function initCurrentRunTime(flag) {
+  if ((currentRunTime === null || !!flag) && getCurrentRunTime() > 14) {
+    currentRunTime = Date.now()
+  }
+}
+
+function vNodeCompareDiffRun(vnode, rnode, parent, fragmentLastEl) {
+  if (!rnode) rnode = []
+  if ((!rnode || !rnode.length) && vnode && vnode.length) {
+    patchCreateNewNodes(...arguments)
+  } else if ((!vnode || !vnode.length) && rnode && rnode.length) {
+    unmountedNodes(...arguments)
+  } else if (vnode && rnode) {
+    patchDiffNode(...arguments)
+  }
   return rnode;
 }
 
-function patch(nn1, cn, nn2, last, n2, parent, diffManager, diffStore) {
+function patch(nn1, cn, nn2, last, n2, parent, diffStore) {
 
   let CURRENT_NODE_PERM = null
 
@@ -915,7 +852,6 @@ function patch(nn1, cn, nn2, last, n2, parent, diffManager, diffStore) {
         vnChildren,
         newChildren,
         cn.el,
-        diffManager
       );
     }
   }
@@ -957,20 +893,20 @@ function setNodeContent(n, content) {
 
 const patchComment = patchText
 
-function patchFragment(nn1, cn, nn2, last, n2, parent, diffManager) {
+function patchFragment(nn1, cn, nn2, last, n2, parent) {
   if (cn) {
     var ocn = null;
     if (nn2 !== cn) {
       if (last) {
-        cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, last)
+        cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, last)
       } else if (nn2) {
         const curNode = isFragment(nn2) ? getLastFragmentNode(n2, ni) : nn2;
-        cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, curNode)
+        cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, curNode)
       } else {
         cn.append(parent);
       }
     } else {
-      cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, diffManager, last)
+      cn.children = vNodeCompareDiffRun(nn1.children, cn.children, parent, last)
     }
     if (ocn) {
       removeNode(ocn);
@@ -982,7 +918,6 @@ function patchFragment(nn1, cn, nn2, last, n2, parent, diffManager) {
       nn1.children,
       [],
       parent,
-      diffManager,
       last
     );
   }
@@ -990,7 +925,7 @@ function patchFragment(nn1, cn, nn2, last, n2, parent, diffManager) {
   return cn
 }
 
-function runDiffStore(diffStore, n1, n2, parent, diffManager, fragmentLastEl) {
+function runDiffStore(diffStore, n1, n2, parent, fragmentLastEl) {
   const didUseState = diffStore.didUseState;
   for (let i = 0; i < didUseState.length; i++) {
     if (didUseState[i] && didUseState[i].el) {
@@ -1016,10 +951,10 @@ function runDiffStore(diffStore, n1, n2, parent, diffManager, fragmentLastEl) {
         node = patchComment(nn1, cn, last, nn2, parent)
         break;
       case ELEMENT:
-        node = patch(nn1, cn, nn2, last, n2, parent, diffManager, diffStore, fragmentLastEl)
+        node = patch(nn1, cn, nn2, last, n2, parent, diffStore, fragmentLastEl)
         break
       case FRAGMENT:
-        node = patchFragment(nn1, cn, nn2, last, n2, parent, diffManager, diffStore, fragmentLastEl)
+        node = patchFragment(nn1, cn, nn2, last, n2, parent, diffStore, fragmentLastEl)
         break;
     }
     nodes.unshift(node);
@@ -1201,13 +1136,12 @@ function removeNode(node) {
 }
 
 function createRender(dom, _vnode) {
-  let diffFiber = null;
-  function render(vnode, isAsync) {
-    if (!diffFiber) {
-      diffFiber = new DiffFiber(dom);
-    }
-    diffFiber.runDiff(vnode, isAsync);
-    return diffFiber;
+  let nodes = [];
+  function render(vnode) {
+    queueJob(() => {
+      nodes = vNodeCompareDiff(vnode, nodes, dom)
+    })
+    return nodes;
   }
   _vnode && render(_vnode);
   return render;

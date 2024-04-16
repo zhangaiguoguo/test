@@ -44,7 +44,7 @@ function isNumber(value) {
 }
 
 export function clearArrayValue(target) {
-  target.splice(target.length, 1)
+  target.splice(0, target.length)
 }
 
 function objectToArrayMap(target) {
