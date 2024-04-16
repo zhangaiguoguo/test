@@ -783,13 +783,6 @@ function patch(nn1, cn, nn2, last, n2, parent, diffStore) {
     }
     var ocn = null;
     if (cn) {
-      if (nn1.tag !== cn.tag) {
-        let cnc = cn.children;
-        ocn = cn;
-        cn = new VNode(nn1, VNODE_OPERATE_PERM);
-        cn.children = cnc;
-        cn.evts = null
-      }
       if (nn2 !== cn) {
         if (last) {
           insertBefore(cn, last);
