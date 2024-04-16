@@ -210,12 +210,6 @@ function keys(target) {
   return _keys(target);
 }
 
-const INIT_NODE_PERM = () => 0b0000000;
-const NODE_ATTR_SET = 0b0000001;
-const NODE_ATTR_ADD = 0b0000010;
-const NODE_ATTR_DEL = 0b0000100;
-const NODE_ATTR_LENGTH = 0b0001000;
-
 const DIFFCHILDRENLENGTH = 0b000001;
 const DIFFCHILDRENTREE = 0b000010;
 const DIFFNODEATTRLENGTH = 0b000100;
