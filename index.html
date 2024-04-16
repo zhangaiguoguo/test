@@ -60,6 +60,12 @@
     data() {
       return data;
     },
+    render(ctx) {
+      return [
+        h('div', '你好'),
+        h("button", { onClick: () => ctx.num++ }, `点击${ctx.num}`)
+      ]
+    },
     methods: {
       fn() {
         this.num++;

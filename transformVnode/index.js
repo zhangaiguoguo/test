@@ -659,7 +659,14 @@ function unMounted(el) {
 }
 
 function useRender(options, ctx) {
-  const renderVnodeStructure = transfrom$$(options.template);
+  let renderVnodeStructure = null
+  if (isFunction(options.render)) {
+    renderVnodeStructure = () => {
+      return options.render(ctx)
+    }
+  } else {
+    renderVnodeStructure = transfrom$$(options.template);
+  }
   console.log(renderVnodeStructure);
   let renderHandle = null;
   return [
