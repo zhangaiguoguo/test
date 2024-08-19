@@ -724,6 +724,7 @@
             this.scheduler = scheduler
             this.isRecollect = !!options.isRecollect
             this.isImplement = false
+            this.dirty = true
             options.init && this.run()
             recordEffectScope(this)
         }
@@ -735,6 +736,10 @@
             if (this.isRecollect && this.deps) {
                 this.start()
             }
+            if (this.deps) {
+                this.stop();
+                this.active = true;
+            }
             this.parent = currentWatcherScope
             try {
                 currentWatcherScope = this
@@ -742,6 +747,7 @@
             } finally {
                 currentWatcherScope = this.parent || null
                 this.parent = null
+                this.dirty = false
             }
         }
         updateDeps(newVal, oldVal, dep, flag) {
@@ -750,6 +756,7 @@
             const flag2 = this.deps.has(dep)
             if (flag2) {
                 this.isImplement = true
+                this.dirty = true
                 this.scheduler(newVal, oldVal);
             }
         }
@@ -949,8 +956,6 @@
         constructor(callback) {
             if (this.is(callback)) {
                 this.deps = void 0
-                this.effect;
-                this._dirty = true
                 this._ref = true
                 this._is_ref = true
                 def(this, proxyKEY1, true)
@@ -973,26 +978,22 @@
             this.set(v)
         }
         track() {
-            if (this._dirty) {
-                if (this.effect) {
-                    this.effect.stop()
-                }
-                const effect = new EffectReactive(() => {
+            if (!this.effect) {
+                this.effect = new EffectReactive(() => {
                     return this.get()
                 }, () => {
                     triggerEffects(this, "value", "set", this._value, this._value, false)
-                    this._dirty = true
                 })
+            }
+            if (this.effect.dirty) {
                 const oldVal = this._value
-                this._value = effect.run()
+                this._value = this.effect.run()
                 if (this.effect) {
                     for (let w of this.deps || []) {
                         triggerTrigger.apply(w, [this.deps, this._value, oldVal])
                     }
                 }
-                this.effect = effect
             }
-            this._dirty = false
             return this._value
         }
     }
